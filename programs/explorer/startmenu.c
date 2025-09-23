@@ -206,35 +206,39 @@ static HBITMAP icon_to_bitmap(HICON hicon)
     return hbitmap;
 }
 
-static int get_icon_index(WCHAR *name, BOOL folder) 
+static int get_icon_index(WCHAR *name, BOOL folder)
 {
     int iconIndex;
 
-    if (!lstrcmpW(L"Control Panel", name)) 
+    if (!lstrcmpW(L"Control Panel", name))
     {
         iconIndex = 36;
     }
-    else if (!lstrcmpW(L"Programs", name)) 
+    else if (!lstrcmpW(L"Programs", name))
     {
         iconIndex = 513;
     }
-    else if (!lstrcmpW(L"Internet Settings", name)) 
+    else if (!lstrcmpW(L"Internet Settings", name))
     {
         iconIndex = 14;
     }
-    else if (!lstrcmpW(L"System Tools", name)) 
+    else if (!lstrcmpW(L"System Tools", name))
     {
         iconIndex = 37;
     }
-    else if (!lstrcmpW(L"Game Controllers", name)) 
+    else if (!lstrcmpW(L"Game Controllers", name))
     {
         iconIndex = 514;
     }
-    else if (!lstrcmpW(L"Add/Remove Programs", name)) 
+    else if (!lstrcmpW(L"Add/Remove Programs", name))
     {
         iconIndex = 148;
-    }    
-    else 
+    }
+    else if (!lstrcmpW(L"Display Settings", name))
+    {
+        iconIndex = 177;
+    }
+    else
     {
         iconIndex = folder ? 4 : 30;
     }
@@ -362,7 +366,7 @@ static struct menu_item* add_shell_item(struct menu_item* parent, LPITEMIDLIST p
             IShellLinkW_Release(link);
         }        
 
-        if (!hicon) 
+        if (!hicon)
         {
             int iconIndex = get_icon_index(item->displayname, item->folder ? TRUE : FALSE);
             ExtractIconExA("shell32.dll", iconIndex, NULL, &hicon, 1);

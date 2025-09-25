@@ -251,7 +251,7 @@ void X11DRV_XF86VM_Init(void)
   void *xvidmode_handle;
   Bool ok;
 
-  if (xf86vm_major) return; /* already initialized? */
+  if (!usexvidmode || xf86vm_major) return;
 
   xvidmode_handle = dlopen(SONAME_LIBXXF86VM, RTLD_NOW);
   if (!xvidmode_handle)
@@ -300,9 +300,6 @@ void X11DRV_XF86VM_Init(void)
           xf86vm_use_gammaramp = TRUE;
   }
 #endif /* X_XF86VidModeSetGammaRamp */
-
-  if (!usexvidmode)
-    return;
 
   xf86vm_handler.name = "XF86VidMode";
   xf86vm_handler.priority = 100;

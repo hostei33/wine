@@ -33,7 +33,6 @@
 
 WINE_DEFAULT_DEBUG_CHANNEL(clipboard);
 
-#define MAX_ATOM_LEN 255
 
 static CRITICAL_SECTION clipboard_cs;
 static CRITICAL_SECTION_DEBUG critsect_debug =
@@ -527,12 +526,7 @@ HANDLE render_synthesized_format( UINT format, UINT from )
  */
 UINT WINAPI RegisterClipboardFormatW( LPCWSTR name )
 {
-    UNICODE_STRING str;
-
-    TRACE( "%s\n", debugstr_w(name) );
-
-    RtlInitUnicodeString( &str, name );
-    return NtUserRegisterWindowMessage( &str );
+    return GlobalAddAtomW( name );
 }
 
 
@@ -541,15 +535,7 @@ UINT WINAPI RegisterClipboardFormatW( LPCWSTR name )
  */
 UINT WINAPI RegisterClipboardFormatA( LPCSTR name )
 {
-    WCHAR buf[MAX_ATOM_LEN + 1];
-    UNICODE_STRING str = {.Buffer = buf, .MaximumLength = sizeof(buf)};
-    STRING ansi;
-
-    TRACE( "%s\n", debugstr_a(name) );
-
-    RtlInitAnsiString( &ansi, name );
-    RtlAnsiStringToUnicodeString( &str, &ansi, FALSE );
-    return NtUserRegisterWindowMessage( &str );
+    return GlobalAddAtomA( name );
 }
 
 

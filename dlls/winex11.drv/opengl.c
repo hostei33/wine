@@ -184,6 +184,7 @@ static const char *glxExtensions;
 static char wglExtensions[4096];
 static int glxVersion[2];
 static int glx_opcode;
+static char *cached_gpu_info = NULL;
 
 struct glx_pixel_format
 {
@@ -428,7 +429,18 @@ static BOOL X11DRV_WineGL_InitOpenglInfo(void)
     }
     gl_renderer = (const char *)pglGetString(GL_RENDERER);
     gl_version  = (const char *)pglGetString(GL_VERSION);
-    glExtensions = (const char *) pglGetString(GL_EXTENSIONS);
+    glExtensions = (const char *)pglGetString(GL_EXTENSIONS);
+
+    if (wnd_gpu_info)
+    {
+        if (cached_gpu_info)
+        {
+            free(cached_gpu_info);
+            cached_gpu_info = NULL;
+        }
+
+        if (gl_renderer) cached_gpu_info = strdup(gl_renderer);
+    }
 
     /* Get the common GLX version supported by GLX client and server ( major/minor) */
     pglXQueryVersion(gdi_display, &glxVersion[0], &glxVersion[1]);
@@ -1054,7 +1066,7 @@ static struct gl_drawable *create_gl_drawable( HWND hwnd, const struct glx_pixel
         gl->colormap = XCreateColormap( gdi_display, get_dummy_parent(), visual->visual,
                                         (visual->class == PseudoColor || visual->class == GrayScale ||
                                          visual->class == DirectColor) ? AllocAll : AllocNone );
-        gl->window = create_client_window( hwnd, visual, gl->colormap );
+        gl->window = create_client_window( hwnd, visual, gl->colormap, cached_gpu_info );
         if (gl->window)
             gl->drawable = pglXCreateWindow( gdi_display, gl->format->fbconfig, gl->window, NULL );
         TRACE( "%p created client %lx drawable %lx\n", hwnd, gl->window, gl->drawable );
@@ -1066,7 +1078,7 @@ static struct gl_drawable *create_gl_drawable( HWND hwnd, const struct glx_pixel
         gl->colormap = XCreateColormap( gdi_display, get_dummy_parent(), visual->visual,
                                         (visual->class == PseudoColor || visual->class == GrayScale ||
                                          visual->class == DirectColor) ? AllocAll : AllocNone );
-        gl->window = create_client_window( hwnd, visual, gl->colormap );
+        gl->window = create_client_window( hwnd, visual, gl->colormap, cached_gpu_info );
         if (gl->window)
         {
             struct x11drv_win_data *data;

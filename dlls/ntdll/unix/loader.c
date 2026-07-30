@@ -2219,7 +2219,6 @@ static int pre_exec(void)
 static void reexec_loader( int argc, char *argv[], char *extra_arg )
 {
     static char noexec[] = "WINELOADERNOEXEC=1";
-    WORD machine = current_machine;
     char **new_argv;
 
     /* have to exec if we have a preloader, or an argument, or if we are the initial wrapper */
@@ -2237,11 +2236,8 @@ static void reexec_loader( int argc, char *argv[], char *extra_arg )
         memcpy( new_argv + 2, argv + 1, argc * sizeof(*argv) );
     }
 
-    /* default to 32-bit loader to support 32-bit prefixes */
-    if (machine == IMAGE_FILE_MACHINE_AMD64) machine = IMAGE_FILE_MACHINE_I386;
-
     putenv( noexec );
-    loader_exec( new_argv, machine );
+    loader_exec( new_argv, current_machine );
     fatal_error( "could not exec the wine loader\n" );
 }
 

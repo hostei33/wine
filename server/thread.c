@@ -1635,7 +1635,11 @@ void kill_thread( struct thread *thread, int violent_death )
         if (do_esync()) check_terminated( thread );
         else signal_sync( thread->sync );
     }
-    else signal_sync( thread->sync );
+    else
+    {
+        signal_sync( thread->sync );
+        if (do_esync()) esync_wake_up( &thread->obj );
+    }
     cleanup_thread( thread );
     remove_process_thread( thread->process, thread );
     release_object( thread );

@@ -458,7 +458,13 @@ BOOL WINAPI SymInitializeW(HANDLE hProcess, PCWSTR UserSearchPath, BOOL fInvadeP
 
     TRACE("(%p %s %u)\n", hProcess, debugstr_w(UserSearchPath), fInvadeProcess);
 
-    if (process_find_by_handle(hProcess))
+    if (hProcess == INVALID_HANDLE_VALUE)
+    {
+        WARN("an invalid process handle was provided!\n");
+
+        return TRUE;
+    }
+    else if (process_find_by_handle(hProcess))
     {
         WARN("the symbols for this process have already been initialized!\n");
 
@@ -547,6 +553,13 @@ BOOL WINAPI SymCleanup(HANDLE hProcess)
     struct process*     next;
 
     TRACE("(%p)\n", hProcess);
+
+    if (hProcess == INVALID_HANDLE_VALUE)
+    {
+        WARN("an invalid process handle was provided!\n");
+
+        return TRUE;
+    }
 
     for (ppcs = &process_first; *ppcs; ppcs = &(*ppcs)->next)
     {

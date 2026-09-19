@@ -1054,6 +1054,19 @@ static NTSTATUS iohid_driver_init(void)
     return bus_main_thread_start(&bus);
 }
 
+static NTSTATUS winlator_driver_init(void)
+{
+    struct bus_main_params bus =
+    {
+        .name = L"WINLATOR",
+        .init_args = NULL,
+        .init_code = winlator_init,
+        .wait_code = winlator_wait,
+    };
+
+    return bus_main_thread_start(&bus);
+}
+
 static NTSTATUS fdo_pnp_dispatch(DEVICE_OBJECT *device, IRP *irp)
 {
     IO_STACK_LOCATION *irpsp = IoGetCurrentIrpStackLocation(irp);
@@ -1073,6 +1086,7 @@ static NTSTATUS fdo_pnp_dispatch(DEVICE_OBJECT *device, IRP *irp)
             enable_sdl = !sdl_driver_init();
         udev_driver_init(enable_sdl);
         iohid_driver_init();
+        winlator_driver_init();
 
         irp->IoStatus.Status = STATUS_SUCCESS;
         break;

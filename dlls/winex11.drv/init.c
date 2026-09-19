@@ -47,6 +47,8 @@ static pthread_once_t init_once = PTHREAD_ONCE_INIT;
 static const struct user_driver_funcs x11drv_funcs;
 static const struct gdi_dc_funcs *xrender_funcs;
 
+BOOL wnd_gpu_info = FALSE;
+
 
 void init_recursive_mutex( pthread_mutex_t *mutex )
 {
@@ -75,6 +77,8 @@ static void device_init(void)
     palette_size = X11DRV_PALETTE_Init();
 
     stock_bitmap_pixmap = XCreatePixmap( gdi_display, root_window, 1, 1, 1 );
+
+    wnd_gpu_info = getenv( "X11_WND_GPU_INFO" ) && atoi( getenv( "X11_WND_GPU_INFO" ) );
 }
 
 
@@ -426,7 +430,8 @@ Window x11drv_client_surface_create( HWND hwnd, const XVisualInfo *visual, Color
     struct x11drv_client_surface *surface;
 
     if (!(surface = client_surface_create( sizeof(*surface), &x11drv_client_surface_funcs, hwnd ))) return None;
-    if (!(surface->window = create_client_window( hwnd, visual, colormap )))
+    if (!(surface->window = create_client_window( hwnd, visual, colormap,
+                                                  wnd_gpu_info ? cached_gpu_info : NULL )))
     {
         client_surface_release( &surface->client );
         return None;

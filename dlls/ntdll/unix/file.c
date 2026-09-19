@@ -3732,7 +3732,7 @@ int find_prefix_end( const char *path, int *offset )
 NTSTATUS create_reparse_target( int dirfd, const char *unix_src, int depth, const char *link_path,
                                 REPARSE_DATA_BUFFER *buffer )
 {
-    ULONG nt_path_len = PATH_MAX, unix_path_len = PATH_MAX;
+    ULONG unix_path_len = PATH_MAX;
     UNICODE_STRING nt_target, nt_full_target;
     ULONG unix_target_len = PATH_MAX;
     char *unix_path = NULL, *d;
@@ -3742,7 +3742,7 @@ NTSTATUS create_reparse_target( int dirfd, const char *unix_src, int depth, cons
     char *unix_target;
     int is_relative;
     NTSTATUS status;
-    WCHAR *nt_path;
+    WCHAR *nt_path = NULL;
 
     if ((status = get_reparse_target( &nt_target, buffer, &is_relative )) != STATUS_REPARSE)
         return status;
@@ -3750,27 +3750,17 @@ NTSTATUS create_reparse_target( int dirfd, const char *unix_src, int depth, cons
     if (is_relative)
     {
         UNICODE_STRING nt_path_tmp;
+        char *tmp_path;
 
         /* resolve the NT path of the source */
-        unix_path = malloc( strlen(unix_src) + 2 );
-        if (!unix_path) return STATUS_NO_MEMORY;
-        strcpy( unix_path, unix_src );
-        d = dirname( unix_path );
-        if (d != unix_path) strcpy( unix_path, d );
-        strcat( unix_path, "/");
-        for (;;)
-        {
-            nt_path = malloc( nt_path_len * sizeof(WCHAR) );
-            if (!nt_path)
-            {
-                free( unix_path );
-                return STATUS_NO_MEMORY;
-            }
-            status = wine_unix_to_nt_file_name( unix_path, nt_path, &nt_path_len );
-            if (status != STATUS_BUFFER_TOO_SMALL) break;
-            free( nt_path );
-        }
-        free( unix_path );
+        tmp_path = malloc( strlen(unix_src) + 2 );
+        if (!tmp_path) return STATUS_NO_MEMORY;
+        strcpy( tmp_path, unix_src );
+        d = dirname( tmp_path );
+        if (d != tmp_path) strcpy( tmp_path, d );
+        strcat( tmp_path, "/");
+        status = unix_to_nt_file_name( tmp_path, &nt_path, FILE_OPEN );
+        free( tmp_path );
         if (status != STATUS_SUCCESS)
             return status;
         /* re-resolve the unix path for the source */
@@ -3802,7 +3792,6 @@ NTSTATUS create_reparse_target( int dirfd, const char *unix_src, int depth, cons
         goto cleanup;
     }
     wcscpy( nt_full_target.Buffer, nt_path );
-    free( nt_path );
     memcpy( &nt_full_target.Buffer[wcslen(nt_full_target.Buffer)], nt_target.Buffer, nt_target_len );
     nt_full_target.Length = wcslen( nt_full_target.Buffer ) * sizeof(WCHAR);
     /* find the unix path for the target */
@@ -3857,6 +3846,7 @@ NTSTATUS create_reparse_target( int dirfd, const char *unix_src, int depth, cons
 
 cleanup:
     free( unix_path );
+    free( nt_path );
     free( nt_full_target.Buffer );
     return status;
 }

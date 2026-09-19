@@ -184,6 +184,7 @@ static const char *glxExtensions;
 static char wglExtensions[4096];
 static int glxVersion[2];
 static int glx_opcode;
+static char *cached_gpu_info = NULL;
 
 struct glx_pixel_format
 {
@@ -421,7 +422,18 @@ static BOOL X11DRV_WineGL_InitOpenglInfo(void)
     }
     gl_renderer = (const char *)pglGetString(GL_RENDERER);
     gl_version  = (const char *)pglGetString(GL_VERSION);
-    glExtensions = (const char *) pglGetString(GL_EXTENSIONS);
+    glExtensions = (const char *)pglGetString(GL_EXTENSIONS);
+
+    if (wnd_gpu_info)
+    {
+        if (cached_gpu_info)
+        {
+            free(cached_gpu_info);
+            cached_gpu_info = NULL;
+        }
+
+        if (gl_renderer) cached_gpu_info = strdup(gl_renderer);
+    }
 
     /* Get the common GLX version supported by GLX client and server ( major/minor) */
     pglXQueryVersion(gdi_display, &glxVersion[0], &glxVersion[1]);
@@ -902,7 +914,7 @@ static BOOL x11drv_surface_create( HWND hwnd, HDC hdc, int format, struct opengl
     gl->colormap = XCreateColormap( gdi_display, get_dummy_parent(), fmt->visual->visual,
                                     (fmt->visual->class == PseudoColor || fmt->visual->class == GrayScale ||
                                      fmt->visual->class == DirectColor) ? AllocAll : AllocNone );
-    gl->window = create_client_window( hwnd, fmt->visual, gl->colormap );
+    gl->window = create_client_window( hwnd, fmt->visual, gl->colormap, cached_gpu_info );
     if (gl->window) gl->drawable = pglXCreateWindow( gdi_display, fmt->fbconfig, gl->window, NULL );
 
     if (!gl->drawable)

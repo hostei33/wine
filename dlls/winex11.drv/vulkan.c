@@ -82,6 +82,8 @@ static void vulkan_surface_destroy( HWND hwnd, struct x11drv_vulkan_surface *sur
 
 static VkResult X11DRV_vulkan_surface_create( HWND hwnd, const struct vulkan_instance *instance, VkSurfaceKHR *handle, void **private )
 {
+    char *gpu_info = NULL;
+
     VkXlibSurfaceCreateInfoKHR info =
     {
         .sType = VK_STRUCTURE_TYPE_XLIB_SURFACE_CREATE_INFO_KHR,
@@ -96,7 +98,18 @@ static VkResult X11DRV_vulkan_surface_create( HWND hwnd, const struct vulkan_ins
         ERR("Failed to allocate vulkan surface for hwnd=%p\n", hwnd);
         return VK_ERROR_OUT_OF_HOST_MEMORY;
     }
-    if (!(surface->window = create_client_window( hwnd, &default_visual, default_colormap )))
+
+    if (wnd_gpu_info)
+    {
+        VkPhysicalDevice physical_device;
+        VkPhysicalDeviceProperties properties;
+        uint32_t device_count = 1;
+        instance->p_vkEnumeratePhysicalDevices( instance->host.instance, &device_count, &physical_device );
+        instance->p_vkGetPhysicalDeviceProperties( physical_device, &properties );
+        gpu_info = properties.deviceName;
+    }
+
+    if (!(surface->window = create_client_window( hwnd, &default_visual, default_colormap, gpu_info )))
     {
         ERR("Failed to allocate client window for hwnd=%p\n", hwnd);
         free( surface );

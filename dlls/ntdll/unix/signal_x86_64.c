@@ -73,6 +73,10 @@
 extern void _thread_set_tsd_base(uint64_t);
 #endif
 
+#include <sys/prctl.h>
+#include <errno.h>
+#include <fcntl.h>
+
 #include "ntstatus.h"
 #define WIN32_NO_STATUS
 #include "windef.h"
@@ -1863,6 +1867,25 @@ static inline DWORD is_privileged_instr( CONTEXT *context )
     return 0;
 }
 
+static void sigsys_handler( int signal, siginfo_t *siginfo, void *sigcontext )
+{
+    extern const void *__wine_syscall_dispatcher_prolog_end_ptr;
+    struct syscall_frame *frame = get_syscall_frame();
+    ucontext_t *ctx = sigcontext;
+
+    TRACE_(seh)("SIGSYS, rax %#llx, rip %#llx.\n", ctx->uc_mcontext.gregs[REG_RAX],
+            ctx->uc_mcontext.gregs[REG_RIP]);
+
+    frame->rip = ctx->uc_mcontext.gregs[REG_RIP] + 0xb;
+    frame->rcx = ctx->uc_mcontext.gregs[REG_RIP];
+    frame->eflags = ctx->uc_mcontext.gregs[REG_EFL];
+    frame->restore_flags = 0;
+    ctx->uc_mcontext.gregs[REG_RCX] = (ULONG_PTR)frame;
+    ctx->uc_mcontext.gregs[REG_R11] = frame->eflags;
+    ctx->uc_mcontext.gregs[REG_EFL] &= ~0x100;  /* clear single-step flag */
+    ctx->uc_mcontext.gregs[REG_RIP] = (ULONG64)__wine_syscall_dispatcher_prolog_end_ptr;
+}
+
 
 /***********************************************************************
  *           handle_interrupt
@@ -2570,10 +2593,8 @@ void signal_init_process(void)
     if (sigaction( SIGSEGV, &sig_act, NULL ) == -1) goto error;
     if (sigaction( SIGILL, &sig_act, NULL ) == -1) goto error;
     if (sigaction( SIGBUS, &sig_act, NULL ) == -1) goto error;
-#ifdef __APPLE__
     sig_act.sa_sigaction = sigsys_handler;
     if (sigaction( SIGSYS, &sig_act, NULL ) == -1) goto error;
-#endif
     return;
 
  error:

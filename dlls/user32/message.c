@@ -29,7 +29,6 @@
 
 WINE_DEFAULT_DEBUG_CHANNEL(msg);
 
-#define MAX_ATOM_LEN  255
 
 /* pack a pointer into a 32/64 portable format */
 static inline ULONGLONG pack_ptr( const void *ptr )
@@ -989,33 +988,23 @@ DWORD WINAPI WaitForInputIdle( HANDLE process, DWORD timeout )
  *		RegisterWindowMessageA (USER32.@)
  *		RegisterWindowMessage (USER.118)
  */
-UINT WINAPI RegisterWindowMessageA( LPCSTR name )
+UINT WINAPI RegisterWindowMessageA( LPCSTR str )
 {
-    WCHAR buf[MAX_ATOM_LEN + 1];
-    UNICODE_STRING str = {.Buffer = buf, .MaximumLength = sizeof(buf)};
-    STRING ansi;
-
-    TRACE( "%s\n", debugstr_a(name) );
-
-    RtlInitAnsiString( &ansi, name );
-    RtlAnsiStringToUnicodeString( &str, &ansi, FALSE );
-    return NtUserRegisterWindowMessage( &str );
+    UINT ret = GlobalAddAtomA(str);
+    TRACE("%s, ret=%x\n", str, ret);
+    return ret;
 }
 
 
 /***********************************************************************
  *		RegisterWindowMessageW (USER32.@)
  */
-UINT WINAPI RegisterWindowMessageW( LPCWSTR name )
+UINT WINAPI RegisterWindowMessageW( LPCWSTR str )
 {
-    UNICODE_STRING str;
-
-    TRACE( "%s\n", debugstr_w(name) );
-
-    RtlInitUnicodeString( &str, name );
-    return NtUserRegisterWindowMessage( &str );
+    UINT ret = GlobalAddAtomW(str);
+    TRACE("%s ret=%x\n", debugstr_w(str), ret);
+    return ret;
 }
-
 
 typedef struct BroadcastParm
 {

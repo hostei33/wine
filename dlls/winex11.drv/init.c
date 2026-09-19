@@ -425,13 +425,14 @@ static const struct client_surface_funcs x11drv_client_surface_funcs =
     .present = X11DRV_client_surface_present,
 };
 
-Window x11drv_client_surface_create( HWND hwnd, const XVisualInfo *visual, Colormap colormap, struct client_surface **client )
+Window x11drv_client_surface_create( HWND hwnd, const XVisualInfo *visual, Colormap colormap,
+                                     const char *gpu_info, struct client_surface **client )
 {
     struct x11drv_client_surface *surface;
 
     if (!(surface = client_surface_create( sizeof(*surface), &x11drv_client_surface_funcs, hwnd ))) return None;
     if (!(surface->window = create_client_window( hwnd, visual, colormap,
-                                                  wnd_gpu_info ? cached_gpu_info : NULL )))
+                                                  wnd_gpu_info ? gpu_info : NULL )))
     {
         client_surface_release( &surface->client );
         return None;

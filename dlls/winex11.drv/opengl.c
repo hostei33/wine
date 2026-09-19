@@ -184,7 +184,7 @@ static const char *glxExtensions;
 static char wglExtensions[4096];
 static int glxVersion[2];
 static int glx_opcode;
-char *cached_gpu_info = NULL;
+static char *cached_gpu_info = NULL;
 
 struct glx_pixel_format
 {
@@ -507,7 +507,8 @@ static BOOL x11drv_egl_surface_create( HWND hwnd, HDC hdc, int format, struct op
     if ((previous = *drawable) && previous->format == format) return TRUE;
     NtUserGetClientRect( hwnd, &rect, NtUserGetDpiForWindow( hwnd ) );
 
-    if (!(window = x11drv_client_surface_create( hwnd, &default_visual, default_colormap, &client ))) return FALSE;
+    if (!(window = x11drv_client_surface_create( hwnd, &default_visual, default_colormap,
+                                                 cached_gpu_info, &client ))) return FALSE;
     gl = opengl_drawable_create( sizeof(*gl), &x11drv_egl_surface_funcs, format, client );
     client_surface_release( client );
     if (!gl) return FALSE;
@@ -956,7 +957,8 @@ static BOOL x11drv_surface_create( HWND hwnd, HDC hdc, int format, struct opengl
                                  fmt->visual->class == DirectColor) ? AllocAll : AllocNone );
     if (!colormap) return FALSE;
 
-    if (!(window = x11drv_client_surface_create( hwnd, fmt->visual, colormap, &client ))) goto failed;
+    if (!(window = x11drv_client_surface_create( hwnd, fmt->visual, colormap,
+                                                 cached_gpu_info, &client ))) goto failed;
     gl = opengl_drawable_create( sizeof(*gl), &x11drv_surface_funcs, format, client );
     client_surface_release( client );
     if (!gl) goto failed;

@@ -315,7 +315,6 @@ extern int X11DRV_PALETTE_Init(void);
 extern BOOL X11DRV_IsSolidColor(COLORREF color);
 
 extern BOOL wnd_gpu_info;
-extern char *cached_gpu_info;
 
 extern COLORREF X11DRV_PALETTE_ToLogical(X11DRV_PDEVICE *physDev, int pixel);
 extern int X11DRV_PALETTE_ToPhysical(X11DRV_PDEVICE *physDev, COLORREF color);
@@ -362,7 +361,8 @@ extern BOOL needs_offscreen_rendering( HWND hwnd );
 extern void set_dc_drawable( HDC hdc, Drawable drawable, const RECT *rect, int mode );
 extern Drawable get_dc_drawable( HDC hdc, RECT *rect );
 extern HRGN get_dc_monitor_region( HWND hwnd, HDC hdc );
-extern Window x11drv_client_surface_create( HWND hwnd, const XVisualInfo *visual, Colormap colormap, struct client_surface **client );
+extern Window x11drv_client_surface_create( HWND hwnd, const XVisualInfo *visual, Colormap colormap,
+                                             const char *gpu_info, struct client_surface **client );
 
 /**************************************************************************
  * X11 USER driver

@@ -321,7 +321,10 @@ static struct object *event_get_sync( struct object *obj )
 static int event_get_esync_fd( struct object *obj, enum esync_type *type )
 {
     struct event *event = (struct event *)obj;
-    struct event_sync *sync = (struct event_sync *)event->sync;
+    struct event_sync *sync;
+
+    assert( event->sync->ops == &event_sync_ops ); /* never called with inproc syncs */
+    sync = (struct event_sync *)event->sync;
 
     *type = sync->manual ? ESYNC_MANUAL_SERVER : ESYNC_AUTO_SERVER;
     return event->esync_fd;

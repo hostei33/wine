@@ -3149,9 +3149,6 @@ DECL_HANDLER(set_queue_mask)
         if (!queue->fd) return;
         clear_queue_bits( queue, QS_DRIVER );
         set_fd_events( queue->fd, POLLIN );
-
-        if (do_esync() && !get_queue_status( queue ))
-            esync_clear( queue->esync_fd );
         return;
     }
 
@@ -3167,6 +3164,9 @@ DECL_HANDLER(set_queue_mask)
 
     if (!get_queue_status( queue )) reset_sync( queue->sync );
     else signal_sync( queue->sync );
+
+    if (do_esync() && !get_queue_status( queue ))
+        esync_clear( queue->esync_fd );
 }
 
 

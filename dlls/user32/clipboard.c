@@ -33,6 +33,7 @@
 
 WINE_DEFAULT_DEBUG_CHANNEL(clipboard);
 
+#define MAX_ATOM_LEN 255
 
 static CRITICAL_SECTION clipboard_cs;
 static CRITICAL_SECTION_DEBUG critsect_debug =

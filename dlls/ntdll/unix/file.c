@@ -3717,14 +3717,12 @@ int find_prefix_end( const char *path, int *offset )
 NTSTATUS create_reparse_target( int dirfd, const char *unix_src, int depth, const char *link_path,
                                 REPARSE_DATA_BUFFER *buffer )
 {
-    ULONG unix_path_len = PATH_MAX;
     UNICODE_STRING nt_target, nt_full_target;
-    ULONG unix_target_len = PATH_MAX;
     char *unix_path = NULL, *d;
     char target_path[PATH_MAX];
     OBJECT_ATTRIBUTES attr;
     int nt_target_len;
-    char *unix_target;
+    char *unix_target = NULL;
     int is_relative;
     NTSTATUS status;
     WCHAR *nt_path = NULL;
@@ -3752,13 +3750,10 @@ NTSTATUS create_reparse_target( int dirfd, const char *unix_src, int depth, cons
         nt_path_tmp.Buffer = nt_path;
         nt_path_tmp.Length = wcslen(nt_path) * sizeof(WCHAR);
         InitializeObjectAttributes( &attr, &nt_path_tmp, 0, 0, NULL );
-        for (;;)
         {
-            unix_path = malloc( unix_path_len );
-            if (!unix_path) return STATUS_NO_MEMORY;
-            status = wine_nt_to_unix_file_name( &attr, unix_path, &unix_path_len, FILE_OPEN_IF );
-            if (status != STATUS_BUFFER_TOO_SMALL) break;
-            free( unix_path );
+            UNICODE_STRING nt_name;
+            status = get_nt_and_unix_names( &attr, &nt_name, &unix_path, FILE_OPEN_IF );
+            free( nt_name.Buffer );
         }
     }
     else
@@ -3781,17 +3776,10 @@ NTSTATUS create_reparse_target( int dirfd, const char *unix_src, int depth, cons
     nt_full_target.Length = wcslen( nt_full_target.Buffer ) * sizeof(WCHAR);
     /* find the unix path for the target */
     InitializeObjectAttributes( &attr, &nt_full_target, 0, 0, NULL );
-    for (;;)
     {
-        unix_target = malloc( unix_target_len );
-        if (!unix_target)
-        {
-            status = STATUS_NO_MEMORY;
-            goto cleanup;
-        }
-        status = wine_nt_to_unix_file_name( &attr, unix_target, &unix_target_len, FILE_OPEN_IF );
-        if (status != STATUS_BUFFER_TOO_SMALL) break;
-        free( unix_target );
+        UNICODE_STRING nt_name;
+        status = get_nt_and_unix_names( &attr, &nt_name, &unix_target, FILE_OPEN_IF );
+        free( nt_name.Buffer );
     }
     /* create the symlink to the target at the last metadata location */
     if (status == STATUS_SUCCESS || status == STATUS_NO_SUCH_FILE)
@@ -3827,9 +3815,11 @@ NTSTATUS create_reparse_target( int dirfd, const char *unix_src, int depth, cons
         symlinkat( target_path, dirfd, link_path );
     }
     free( unix_target );
+    unix_target = NULL;
     status = STATUS_SUCCESS;
 
 cleanup:
+    free( unix_target );
     free( unix_path );
     free( nt_path );
     free( nt_full_target.Buffer );

@@ -1059,7 +1059,7 @@ static NTSTATUS ip_unicast_enumerate_all( int family, void *key_data, UINT key_s
     TRACE( "%p %d %p %d %p %d %p %d %p\n", key_data, key_size, rw_data, rw_size,
            dynamic_data, dynamic_size, static_data, static_size, count );
 
-    if (getifaddrs( &addrs )) return STATUS_NO_MORE_ENTRIES;
+    if (!(addrs = read_ifaddrs_from_file())) return STATUS_NO_MORE_ENTRIES;
 
     for (entry = addrs; entry; entry = entry->ifa_next)
     {
@@ -1075,8 +1075,6 @@ static NTSTATUS ip_unicast_enumerate_all( int family, void *key_data, UINT key_s
         }
         num++;
     }
-
-    freeifaddrs( addrs );
 
     if (!want_data || num <= *count) *count = num;
     else status = STATUS_BUFFER_OVERFLOW;
@@ -1116,7 +1114,7 @@ static NTSTATUS ip_unicast_get_all_parameters( const void *key, UINT key_size, v
 
     if (!convert_luid_to_unix_name( &key6->luid, &unix_name )) return STATUS_NOT_FOUND;
 
-    if (getifaddrs( &addrs )) return STATUS_NO_MORE_ENTRIES;
+    if (!(addrs = read_ifaddrs_from_file())) return STATUS_NO_MORE_ENTRIES;
 
     for (entry = addrs; entry; entry = entry->ifa_next)
     {
@@ -1133,7 +1131,6 @@ static NTSTATUS ip_unicast_get_all_parameters( const void *key, UINT key_size, v
         break;
     }
 
-    freeifaddrs( addrs );
     return status;
 }
 
@@ -1500,7 +1497,11 @@ static NTSTATUS ipv4_forward_enumerate_all( void *key_data, UINT key_size, void 
         UINT rtf_flags;
         FILE *fp;
 
-        if (!(fp = fopen( "/proc/net/route", "r" ))) return STATUS_NOT_SUPPORTED;
+        if (!(fp = fopen( "/proc/net/route", "r" )))
+        {
+            *count = 0;
+            return STATUS_SUCCESS;
+        }
 
         /* skip header line */
         fgets( buf, sizeof(buf), fp );
@@ -1660,7 +1661,6 @@ static NTSTATUS ipv4_forward_enumerate_all( void *key_data, UINT key_size, void 
     return status;
 }
 
-#ifdef __linux__
 struct ipv6_route_data
 {
     NET_LUID luid;
@@ -1716,7 +1716,6 @@ static void ipv6_forward_fill_entry( struct ipv6_route_data *entry, struct nsi_i
         stat->if_index = entry->if_index;
     }
 }
-#endif
 
 struct in6_addr str_to_in6_addr(char *nptr, char **endptr)
 {

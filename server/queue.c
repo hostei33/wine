@@ -3184,13 +3184,13 @@ DECL_HANDLER(get_queue_status)
         reply->wake_bits      = shared->wake_bits;
         reply->changed_bits   = shared->changed_bits;
         shared->changed_bits &= ~req->clear_bits;
-
-        if (do_esync() && !get_queue_status( queue ))
-            esync_clear( queue->esync_fd );
     }
     SHARED_WRITE_END;
 
     if (!get_queue_status( queue )) reset_sync( queue->sync );
+
+    if (do_esync() && !get_queue_status( queue ))
+        esync_clear( queue->esync_fd );
 }
 
 

@@ -3633,6 +3633,8 @@ static void test_barrier(void)
         ok( true_ret_count == 1, "got %ld.\n", true_ret_count );
         winetest_pop_context();
     }
+}
+
 static int zigzag_state, zigzag_count[2], zigzag_stop;
 
 static DWORD CALLBACK zigzag_event0(void *arg)

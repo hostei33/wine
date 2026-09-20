@@ -72,6 +72,7 @@ static const struct object_ops mutex_sync_ops =
     add_queue,                 /* add_queue */
     remove_queue,              /* remove_queue */
     mutex_sync_signaled,       /* signaled */
+    NULL,                      /* get_esync_fd */
     mutex_sync_satisfied,      /* satisfied */
     no_signal,                 /* signal */
     no_get_fd,                 /* get_fd */
@@ -185,6 +186,7 @@ static const struct object_ops mutex_ops =
     NULL,                      /* add_queue */
     NULL,                      /* remove_queue */
     NULL,                      /* signaled */
+    NULL,                      /* get_esync_fd */
     NULL,                      /* satisfied */
     mutex_signal,              /* signal */
     no_get_fd,                 /* get_fd */

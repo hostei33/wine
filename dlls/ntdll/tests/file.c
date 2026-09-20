@@ -6095,8 +6095,11 @@ static void test_reparse_points(void)
     status = NtOpenFile( &handle, READ_CONTROL, &attr, &io, 0, 0 );
     ok( !status, "open %s failed %#lx\n", wine_dbgstr_w(nameW.Buffer), status );
 
-    status = pNtFsControlFile( handle, NULL, NULL, NULL, &io, FSCTL_GET_REPARSE_POINT, NULL, 0, NULL, 0 );
-    ok( status == STATUS_INVALID_USER_BUFFER, "expected %#lx, got %#lx\n", STATUS_INVALID_USER_BUFFER, status );
+    /* Create the folder to be replaced by a junction point */
+    lstrcpyW(reparse_path, path);
+    lstrcatW(reparse_path, reparseW);
+    bret = CreateDirectoryW(reparse_path, NULL);
+    ok(bret, "Failed to create junction point directory.\n");
 
     status = pNtFsControlFile( handle, NULL, NULL, NULL, &io, FSCTL_GET_REPARSE_POINT, NULL, 0, buffer, 0 );
     ok( status == STATUS_INVALID_USER_BUFFER, "expected %#lx, got %#lx\n", STATUS_INVALID_USER_BUFFER, status );
@@ -6973,7 +6976,7 @@ START_TEST(file)
     test_ioctl();
     test_query_ea();
     test_flush_buffers_file();
-    test_mailslot_name();
     test_reparse_points();
     test_file_map_large_size();
+    test_mailslot_name();
 }

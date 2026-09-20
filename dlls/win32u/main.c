@@ -2077,11 +2077,6 @@ BOOL SYSCALL_API NtUserRegisterTouchPadCapable( BOOL capable )
     SYSCALL_FUNC( NtUserRegisterTouchPadCapable );
 }
 
-ATOM SYSCALL_API NtUserRegisterWindowMessage( UNICODE_STRING *name )
-{
-    SYSCALL_FUNC( NtUserRegisterWindowMessage );
-}
-
 BOOL SYSCALL_API NtUserReleaseCapture(void)
 {
     SYSCALL_FUNC( NtUserReleaseCapture );

@@ -2129,7 +2129,7 @@ void destroy_client_window( HWND hwnd, Window client_window )
 /**********************************************************************
  *		create_client_window
  */
-Window create_client_window( HWND hwnd, const XVisualInfo *visual, Colormap colormap, const char *gpu_info )
+Window create_client_window( HWND hwnd, const XVisualInfo *visual, Colormap colormap )
 {
     struct x11drv_win_data *data = get_win_data( hwnd );
     XSetWindowAttributes attr;
@@ -2173,12 +2173,6 @@ Window create_client_window( HWND hwnd, const XVisualInfo *visual, Colormap colo
         const BOOL is_surface = TRUE;
         XChangeProperty( gdi_display, data->client_window, x11drv_atom(_NET_WM_SURFACE),
                          XA_CARDINAL, 8, PropModeReplace, (unsigned char *)&is_surface, 1 );
-
-        if (gpu_info)
-        {
-            XChangeProperty( gdi_display, data->client_window, x11drv_atom(_NET_WM_GPU_INFO),
-                             XA_CARDINAL, 8, PropModeReplace, (unsigned char *)gpu_info, strlen(gpu_info) );
-        }
 
         XMapWindow( gdi_display, data->client_window );
         if (data->whole_window)

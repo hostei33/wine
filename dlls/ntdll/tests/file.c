@@ -6973,7 +6973,7 @@ START_TEST(file)
     test_ioctl();
     test_query_ea();
     test_flush_buffers_file();
+    test_mailslot_name();
     test_reparse_points();
     test_file_map_large_size();
-    test_mailslot_name();
 }

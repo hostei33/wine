@@ -184,6 +184,7 @@ static const char *glxExtensions;
 static char wglExtensions[4096];
 static int glxVersion[2];
 static int glx_opcode;
+static char *cached_gpu_info = NULL;
 
 struct glx_pixel_format
 {
@@ -400,7 +401,18 @@ static BOOL X11DRV_WineGL_InitOpenglInfo(void)
     }
     gl_renderer = (const char *)pglGetString(GL_RENDERER);
     gl_version  = (const char *)pglGetString(GL_VERSION);
-    glExtensions = (const char *) pglGetString(GL_EXTENSIONS);
+    glExtensions = (const char *)pglGetString(GL_EXTENSIONS);
+
+    if (wnd_gpu_info)
+    {
+        if (cached_gpu_info)
+        {
+            free(cached_gpu_info);
+            cached_gpu_info = NULL;
+        }
+
+        if (gl_renderer) cached_gpu_info = strdup(gl_renderer);
+    }
 
     /* Get the common GLX version supported by GLX client and server ( major/minor) */
     pglXQueryVersion(gdi_display, &glxVersion[0], &glxVersion[1]);
@@ -517,7 +529,7 @@ static BOOL x11drv_egl_surface_create( HWND hwnd, int format, struct opengl_draw
     if ((previous = *drawable) && previous->format == format) return TRUE;
     NtUserGetClientRect( hwnd, &rect, NtUserGetDpiForWindow( hwnd ) );
 
-    if (!(window = x11drv_client_surface_create( hwnd, format, &client ))) return FALSE;
+    if (!(window = x11drv_client_surface_create( hwnd, format, cached_gpu_info, &client ))) return FALSE;
     gl = opengl_drawable_create( sizeof(*gl), &x11drv_egl_surface_funcs, format, client );
     client_surface_release( client );
     if (!gl) return FALSE;
@@ -949,7 +961,7 @@ static BOOL x11drv_surface_create( HWND hwnd, int format, struct opengl_drawable
     if ((previous = *drawable) && previous->format == format) return TRUE;
     NtUserGetClientRect( hwnd, &rect, NtUserGetDpiForWindow( hwnd ) );
 
-    if (!(window = x11drv_client_surface_create( hwnd, format, &client ))) return FALSE;
+    if (!(window = x11drv_client_surface_create( hwnd, format, cached_gpu_info, &client ))) return FALSE;
     gl = opengl_drawable_create( sizeof(*gl), &x11drv_surface_funcs, format, client );
     client_surface_release( client );
     if (!gl) return FALSE;

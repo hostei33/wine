@@ -29,6 +29,8 @@
 #include <sys/socket.h>
 #include <sys/ioctl.h>
 #include <unistd.h>
+#include <ifaddrs.h>
+#include <arpa/inet.h>
 
 #ifdef HAVE_NET_IF_H
 #include <net/if.h>
@@ -90,6 +92,8 @@
 
 WINE_DEFAULT_DEBUG_CHANNEL(nsi);
 
+#define IFADDRS_PATH "/data/data/com.winlator/files/rootfs/tmp/ifaddrs"
+
 struct if_entry
 {
     struct list entry;
@@ -104,6 +108,91 @@ struct if_entry
 
 static struct list if_list = LIST_INIT( if_list );
 static pthread_mutex_t if_list_lock = PTHREAD_MUTEX_INITIALIZER;
+static struct ifaddrs *cached_ifaddrs = NULL;
+
+struct ifaddrs *read_ifaddrs_from_file( void )
+{
+    FILE *file;
+
+    if (cached_ifaddrs)
+        return cached_ifaddrs;
+
+    file = fopen( IFADDRS_PATH, "r" );
+    if (file)
+    {
+        struct ifaddrs *first = NULL;
+        struct ifaddrs *last = NULL;
+        struct ifaddrs *curr = NULL;
+        int col;
+        int addr_family;
+        int addr_scope_id;
+        char *value;
+        char line[128] = {0};
+
+        while (fgets( line, 128, file ))
+        {
+            curr = calloc( 1, sizeof(struct ifaddrs) );
+
+            col = 0;
+            addr_family = 0;
+            value = strtok( line, "," );
+            while (value)
+            {
+                switch (col)
+                {
+                case 0:
+                    curr->ifa_name = strdup( value );
+                    break;
+                case 1:
+                    curr->ifa_flags = strtol( value, NULL, 10 );
+                    break;
+                case 2:
+                    addr_family = strtol( value, NULL, 10 );
+                    break;
+                case 3:
+                    addr_scope_id = strtol( value, NULL, 10 );
+                    break;
+                case 4:
+                case 5:
+                {
+                    struct sockaddr *ifa_addr = NULL;
+                    if (addr_family == AF_INET6)
+                    {
+                        struct sockaddr_in6 *sin6 = calloc( 1, sizeof(struct sockaddr_in6) );
+                        sin6->sin6_family = AF_INET6;
+                        sin6->sin6_scope_id = addr_scope_id;
+                        inet_pton(AF_INET6, value, &sin6->sin6_addr);
+                        ifa_addr = (struct sockaddr *)sin6;
+                    }
+                    else if (addr_family == AF_INET)
+                    {
+                        struct sockaddr_in *sin = calloc( 1, sizeof(struct sockaddr_in) );
+                        sin->sin_family = AF_INET;
+                        inet_pton(AF_INET, value, &sin->sin_addr);
+                        ifa_addr = (struct sockaddr *)sin;
+                    }
+
+                    if (col == 4) curr->ifa_addr = ifa_addr;
+                    else curr->ifa_netmask = ifa_addr;
+                    break;
+                }
+                }
+
+                value = strtok( NULL, "," );
+                col++;
+            }
+            
+            if (!first) first = curr;
+            if (last) last->ifa_next = curr;
+            last = curr;
+        }
+
+        fclose( file );
+        cached_ifaddrs = first;
+    }
+
+    return cached_ifaddrs;
+}
 
 static struct if_entry *find_entry_from_index( UINT index )
 {
@@ -275,7 +364,7 @@ static WCHAR *strdupAtoW( const char *str )
     return ret;
 }
 
-static struct if_entry *add_entry( UINT index, char *name )
+static struct if_entry *add_entry( UINT index, char *name, BOOL is_fake_eth )
 {
     struct if_entry *entry;
     int name_len = strlen( name );
@@ -293,7 +382,11 @@ static struct if_entry *add_entry( UINT index, char *name )
         return NULL;
     }
 
-    if_get_physical( name, &entry->if_type, &entry->if_phys_addr );
+    if (is_fake_eth)
+    {
+        entry->if_type = MIB_IF_TYPE_ETHERNET;
+        memset( &entry->if_phys_addr, 0, sizeof(entry->if_phys_addr) );
+    } else if_get_physical( name, &entry->if_type, &entry->if_phys_addr );
 
     entry->if_luid.Info.Reserved = 0;
     entry->if_luid.Info.NetLuidIndex = index;
@@ -309,16 +402,26 @@ static struct if_entry *add_entry( UINT index, char *name )
 
 static unsigned int update_if_table( void )
 {
-    struct if_nameindex *indices = if_nameindex(), *entry;
+    struct ifaddrs *addrs, *entry;
     unsigned int append_count = 0;
+    char *last_name = NULL;
+    
+    addrs = read_ifaddrs_from_file();
+    if (!addrs) return 0;
 
-    for (entry = indices; entry->if_index; entry++)
+    for (entry = addrs; entry; entry = entry->ifa_next)
     {
-        if (!find_entry_from_index( entry->if_index ) && add_entry( entry->if_index, entry->if_name ))
-            ++append_count;
+        if (!entry->ifa_addr) continue;
+
+        if (!last_name || strcmp( entry->ifa_name, last_name ) != 0)
+        {
+            if (!find_entry_from_index( append_count+1 ) && add_entry( append_count+1, entry->ifa_name, TRUE ))
+                ++append_count;
+
+            last_name = entry->ifa_name;
+        }
     }
 
-    if_freenameindex( indices );
     return append_count;
 }
 

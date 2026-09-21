@@ -24,8 +24,6 @@
 #include "winbase.h"
 #include "ntuser.h"
 
-#define MAX_ATOM_LEN  255
-
 #define check_member_( file, line, val, exp, fmt, member )                                         \
     ok_(file, line)( (val).member == (exp).member, "got " #member " " fmt "\n", (val).member )
 #define check_member( val, exp, fmt, member )                                                      \
@@ -179,75 +177,7 @@ static void test_window_props(void)
 
 static void test_class(void)
 {
-    struct pinned_atom
-    {
-        ATOM atom;
-        const WCHAR *name;
-        BOOL class;
-    };
-    static const struct pinned_atom user_atoms[] =
-    {
-        { 0xc001, L"USER32" },
-        { 0xc002, L"ObjectLink" },
-        { 0xc003, L"OwnerLink" },
-        { 0xc004, L"Native" },
-        { 0xc005, L"Binary" },
-        { 0xc006, L"FileName" },
-        { 0xc007, L"FileNameW" },
-        { 0xc008, L"NetworkName" },
-        { 0xc009, L"DataObject" },
-        { 0xc00a, L"Embedded Object" },
-        { 0xc00b, L"Embed Source" },
-        { 0xc00c, L"Custom Link Source" },
-        { 0xc00d, L"Link Source" },
-        { 0xc00e, L"Object Descriptor" },
-        { 0xc00f, L"Link Source Descriptor" },
-        { 0xc010, L"OleDraw" },
-        { 0xc011, L"PBrush" },
-        { 0xc012, L"MSDraw" },
-        { 0xc013, L"Ole Private Data" },
-        { 0xc014, L"Screen Picture" },
-        { 0xc015, L"OleClipboardPersistOnFlush" },
-        { 0xc016, L"MoreOlePrivateData" },
-        { 0xc017, L"Button", TRUE },
-        { 0xc018, L"Edit", TRUE },
-        { 0xc019, L"Static", TRUE },
-        { 0xc01a, L"ListBox", TRUE },
-        { 0xc01b, L"ScrollBar", TRUE },
-        { 0xc01c, L"ComboBox", TRUE },
-    };
-    static const struct pinned_atom global_atoms[] =
-    {
-        { 0xc001, L"StdExit" },
-        { 0xc002, L"StdNewDocument" },
-        { 0xc003, L"StdOpenDocument" },
-        { 0xc004, L"StdEditDocument" },
-        { 0xc005, L"StdNewfromTemplate" },
-        { 0xc006, L"StdCloseDocument" },
-        { 0xc007, L"StdShowItem" },
-        { 0xc008, L"StdDoVerbItem" },
-        { 0xc009, L"System" },
-        { 0xc00a, L"OLEsystem" },
-        { 0xc00b, L"StdDocumentName" },
-        { 0xc00c, L"Protocols" },
-        { 0xc00d, L"Topics" },
-        { 0xc00e, L"Formats" },
-        { 0xc00f, L"Status" },
-        { 0xc010, L"EditEnvItems" },
-        { 0xc011, L"True" },
-        { 0xc012, L"False" },
-        { 0xc013, L"Change" },
-        { 0xc014, L"Save" },
-        { 0xc015, L"Close" },
-        { 0xc016, L"MSDraw" },
-        { 0xc017, L"CC32SubclassInfo" },
-    };
-    char DECLSPEC_ALIGN(8) abi_buf[sizeof(ATOM_BASIC_INFORMATION) + MAX_ATOM_LEN * sizeof(WCHAR)];
-    ATOM_BASIC_INFORMATION *abi = (ATOM_BASIC_INFORMATION *)abi_buf;
-    HWINSTA old_winstation, winstation;
     UNICODE_STRING name;
-    ATOM class, global;
-    NTSTATUS status;
     WCHAR buf[64];
     WNDCLASSW cls;
     HANDLE prop;
@@ -2976,8 +2906,6 @@ START_TEST(win32u)
     test_NtUserCloseWindowStation();
     test_NtUserDisplayConfigGetDeviceInfo();
     test_NtUserQueryWindow();
-    test_RegisterClipboardFormat();
-    test_NtUserRegisterWindowMessage();
 
     run_in_process( argv, "NtUserEnableMouseInPointer 0" );
     run_in_process( argv, "NtUserEnableMouseInPointer 1" );

@@ -35,6 +35,7 @@
 #include "thread.h"
 #include "request.h"
 #include "security.h"
+#include "esync.h"
 
 static const WCHAR event_name[] = {'E','v','e','n','t'};
 
@@ -70,6 +71,7 @@ static const struct object_ops event_sync_ops =
     add_queue,                 /* add_queue */
     remove_queue,              /* remove_queue */
     event_sync_signaled,       /* signaled */
+    NULL,                      /* get_esync_fd */
     event_sync_satisfied,      /* satisfied */
     event_sync_signal,         /* signal */
     no_get_fd,                 /* get_fd */
@@ -155,10 +157,13 @@ struct event
     struct object      obj;             /* object header */
     struct object     *sync;            /* event sync object */
     struct list        kernel_object;   /* list of kernel object pointers */
+    int                manual_reset;    /* is it a manual reset event? */
+    int                esync_fd;        /* esync file descriptor */
 };
 
 static void event_dump( struct object *obj, int verbose );
 static struct object *event_get_sync( struct object *obj );
+static int event_get_esync_fd( struct object *obj, enum esync_type *type );
 static int event_signal( struct object *obj, unsigned int access, int signal );
 static struct list *event_get_kernel_obj_list( struct object *obj );
 static void event_destroy( struct object *obj );
@@ -171,6 +176,7 @@ static const struct object_ops event_ops =
     NULL,                      /* add_queue */
     NULL,                      /* remove_queue */
     NULL,                      /* signaled */
+    event_get_esync_fd,        /* get_esync_fd */
     NULL,                      /* satisfied */
     event_signal,              /* signal */
     no_get_fd,                 /* get_fd */
@@ -219,6 +225,7 @@ static const struct object_ops keyed_event_ops =
     add_queue,                   /* add_queue */
     remove_queue,                /* remove_queue */
     keyed_event_signaled,        /* signaled */
+    NULL,                        /* get_esync_fd */
     no_satisfied,                /* satisfied */
     no_signal,                   /* signal */
     no_get_fd,                   /* get_fd */
@@ -251,11 +258,16 @@ struct event *create_event( struct object *root, const struct unicode_str *name,
             event->sync = NULL;
             list_init( &event->kernel_object );
 
+            event->manual_reset = manual_reset;
+
             if (!(event->sync = create_event_sync( manual_reset, initial_state )))
             {
                 release_object( event );
                 return NULL;
             }
+
+            if (do_esync())
+                event->esync_fd = esync_create_fd( initial_state, 0 );
         }
     }
     return event;
@@ -263,17 +275,26 @@ struct event *create_event( struct object *root, const struct unicode_str *name,
 
 struct event *get_event_obj( struct process *process, obj_handle_t handle, unsigned int access )
 {
+    struct object *obj;
+    if (do_esync() && (obj = get_handle_obj( process, handle, access, &esync_ops)))
+        return (struct event *)obj; /* even though it's not an event */
+
     return (struct event *)get_handle_obj( process, handle, access, &event_ops );
 }
 
 void set_event( struct event *event )
 {
     signal_sync( event->sync );
+
+    /* wake up esync waiters on the event itself (the sync object has no esync fd) */
+    if (do_esync()) esync_wake_up( &event->obj );
 }
 
 void reset_event( struct event *event )
 {
     reset_sync( event->sync );
+
+    if (do_esync()) esync_clear( event->esync_fd );
 }
 
 static void event_dump( struct object *obj, int verbose )
@@ -288,6 +309,13 @@ static struct object *event_get_sync( struct object *obj )
     struct event *event = (struct event *)obj;
     assert( obj->ops == &event_ops );
     return grab_object( event->sync );
+}
+
+static int event_get_esync_fd( struct object *obj, enum esync_type *type )
+{
+    struct event *event = (struct event *)obj;
+    *type = event->manual_reset ? ESYNC_MANUAL_SERVER : ESYNC_AUTO_SERVER;
+    return event->esync_fd;
 }
 
 static int event_signal( struct object *obj, unsigned int access, int signal )
@@ -319,6 +347,9 @@ static void event_destroy( struct object *obj )
     assert( obj->ops == &event_ops );
 
     if (event->sync) release_object( event->sync );
+
+    if (do_esync())
+        close( event->esync_fd );
 }
 
 struct keyed_event *create_keyed_event( struct object *root, const struct unicode_str *name,

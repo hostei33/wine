@@ -284,6 +284,12 @@ struct event *get_event_obj( struct process *process, obj_handle_t handle, unsig
 
 void set_event( struct event *event )
 {
+    if (do_esync() && event->obj.ops == &esync_ops)
+    {
+        esync_set_event( (struct esync *)event );
+        return;
+    }
+
     signal_sync( event->sync );
 
     /* wake up esync waiters on the event itself (the sync object has no esync fd) */
@@ -292,6 +298,12 @@ void set_event( struct event *event )
 
 void reset_event( struct event *event )
 {
+    if (do_esync() && event->obj.ops == &esync_ops)
+    {
+        esync_reset_event( (struct esync *)event );
+        return;
+    }
+
     reset_sync( event->sync );
 
     if (do_esync()) esync_clear( event->esync_fd );

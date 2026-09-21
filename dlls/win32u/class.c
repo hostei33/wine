@@ -318,6 +318,34 @@ BOOL is_message_class( UNICODE_STRING *name )
     return name->Length == sizeof(messageW) && !wcsnicmp( name->Buffer, messageW, ARRAY_SIZE(messageW) );
 }
 
+static unsigned int is_integral_atom( const WCHAR *atomstr, ULONG len, RTL_ATOM *ret_atom )
+{
+    RTL_ATOM atom;
+
+    if ((ULONG_PTR)atomstr >> 16)
+    {
+        const WCHAR* ptr = atomstr;
+        if (!len) return STATUS_OBJECT_NAME_INVALID;
+
+        if (*ptr++ == '#')
+        {
+            atom = 0;
+            while (ptr < atomstr + len && *ptr >= '0' && *ptr <= '9')
+            {
+                atom = atom * 10 + *ptr++ - '0';
+            }
+            if (ptr > atomstr + 1 && ptr == atomstr + len) goto done;
+        }
+        if (len > MAX_ATOM_LEN) return STATUS_INVALID_PARAMETER;
+        return STATUS_MORE_ENTRIES;
+    }
+    else if ((atom = LOWORD( atomstr )) >= MAXINTATOM) return STATUS_INVALID_PARAMETER;
+done:
+    if (atom >= MAXINTATOM) atom = 0;
+    if (!(*ret_atom = atom)) return STATUS_INVALID_PARAMETER;
+    return STATUS_SUCCESS;
+}
+
 static ULONG integral_atom_name( WCHAR *buffer, ULONG len, RTL_ATOM atom )
 {
     char tmp[16];
@@ -701,6 +729,39 @@ ULONG WINAPI NtUserGetAtomName( ATOM atom, UNICODE_STRING *name )
     if (size) memcpy( name->Buffer, buffer, size );
     name->Buffer[size / sizeof(WCHAR)] = 0;
     return size / sizeof(WCHAR);
+}
+
+/***********************************************************************
+ *       NtUserRegisterWindowMessage   (win32u.@)
+ */
+ATOM WINAPI NtUserRegisterWindowMessage( UNICODE_STRING *name )
+{
+    unsigned int status;
+    RTL_ATOM atom = 0;
+
+    TRACE( "%s\n", debugstr_us(name) );
+
+    if (!name)
+    {
+        RtlSetLastWin32Error( ERROR_INVALID_PARAMETER );
+        return 0;
+    }
+
+    status = is_integral_atom( name->Buffer, name->Length / sizeof(WCHAR), &atom );
+    if (status == STATUS_MORE_ENTRIES)
+    {
+        SERVER_START_REQ( add_user_atom )
+        {
+            wine_server_add_data( req, name->Buffer, name->Length );
+            status = wine_server_call( req );
+            atom = reply->atom;
+        }
+        SERVER_END_REQ;
+    }
+
+    TRACE( "%s -> %x\n", debugstr_us(name), status == STATUS_SUCCESS ? atom : 0 );
+    set_ntstatus( status );
+    return atom;
 }
 
 /***********************************************************************

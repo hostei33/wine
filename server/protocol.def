@@ -4187,7 +4187,6 @@ enum esync_type
     int enable;                /* previous state of auto-repeat enable */
 @END
 
-
 enum inproc_sync_type
 {
     INPROC_SYNC_UNKNOWN   = 0,
@@ -4268,7 +4267,6 @@ enum inproc_sync_type
 @REPLY
     obj_handle_t        handle;         /* shared object handle */
 @END
-
 
 /* Retrieve the fd to wait on for user APCs. */
 @REQ(get_esync_apc_fd)

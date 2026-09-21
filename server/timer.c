@@ -116,7 +116,6 @@ static struct timer *create_timer( struct object *root, const struct unicode_str
             timer->period   = 0;
             timer->timeout  = NULL;
             timer->thread   = NULL;
-
             timer->esync_fd = -1;
 
             if (!(timer->sync = create_internal_sync( manual, 0 )))
@@ -168,8 +167,6 @@ static void timer_callback( void *private )
 
     timer->signaled = 1;
     signal_sync( timer->sync );
-
-    /* wake up esync waiters on the timer itself (the sync object has no esync fd) */
     if (do_esync()) esync_wake_up( &timer->obj );
 }
 
@@ -247,7 +244,6 @@ static void timer_destroy( struct object *obj )
     if (timer->timeout) remove_timeout_user( timer->timeout );
     if (timer->thread) release_object( timer->thread );
     if (timer->sync) release_object( timer->sync );
-
     if (do_esync()) close( timer->esync_fd );
 }
 

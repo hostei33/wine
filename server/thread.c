@@ -1635,7 +1635,8 @@ static void check_terminated( void *arg )
     /* grab reference since object can be destroyed while trying to wake up */
     grab_object( &thread->obj );
     thread->exit_poll = NULL;
-    wake_up( &thread->obj, 0 );
+    signal_sync( thread->sync );
+    esync_wake_up( &thread->obj );
     release_object( &thread->obj );
 }
 
@@ -1660,12 +1661,12 @@ void kill_thread( struct thread *thread, int violent_death )
     abandon_mutexes( thread );
     if (do_esync())
         esync_abandon_mutexes( thread );
-
     if (violent_death)
     {
-        signal_sync( thread->sync );
         send_thread_signal( thread, SIGQUIT );
+        /* with esync, don't wake up until the thread is really dead, to avoid race conditions */
         if (do_esync()) check_terminated( thread );
+        else signal_sync( thread->sync );
     }
     else
     {

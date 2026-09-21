@@ -1689,16 +1689,6 @@ static inline void put_unicode_string( WCHAR *src, WCHAR **dst, UNICODE_STRING *
     copy_unicode_string( &src, dst, str, wcslen(src) * sizeof(WCHAR) );
 }
 
-static inline void append_unicode_string( WCHAR *src, WCHAR **dst, UNICODE_STRING *str )
-{
-    UINT len = wcslen(src) * sizeof(WCHAR);
-    str->Length += len;
-    str->MaximumLength += len + sizeof(WCHAR);
-    memcpy( *dst, src, len );
-    (*dst)[len / sizeof(WCHAR)] = 0;
-    *dst += len / sizeof(WCHAR) + 1;
-}
-
 static void copy_dos_path_string( WCHAR **src, WCHAR **dst, UNICODE_STRING *str,
                                   UNICODE_STRING *nt_str, UINT len )
 {
@@ -1721,6 +1711,16 @@ static void copy_dos_path_string( WCHAR **src, WCHAR **dst, UNICODE_STRING *str,
         copy_unicode_string( src, dst, str, len );
         ptr[1] = '\\'; /* change \??\ to \\?\ */
     }
+}
+
+static inline void append_unicode_string( WCHAR *src, WCHAR **dst, UNICODE_STRING *str )
+{
+    UINT len = wcslen(src) * sizeof(WCHAR);
+    str->Length += len;
+    str->MaximumLength += len + sizeof(WCHAR);
+    memcpy( *dst, src, len );
+    (*dst)[len / sizeof(WCHAR)] = 0;
+    *dst += len / sizeof(WCHAR) + 1;
 }
 
 static inline WCHAR *get_dos_path( WCHAR *nt_path )
@@ -2084,7 +2084,7 @@ static RTL_USER_PROCESS_PARAMETERS *build_initial_params( void **module )
  */
 void init_startup_info(void)
 {
-    WCHAR *src, *dst, *env, *image, *extra_args;
+    WCHAR *src, *dst, *env, *extra_args;
     char *wine_args;
     void *module = NULL;
     unsigned int status;
@@ -2192,6 +2192,7 @@ void init_startup_info(void)
         extra_args = NULL;
     }
     else copy_unicode_string( &src, &dst, &params->CommandLine, info->cmdline_len );
+
     copy_unicode_string( &src, &dst, &params->WindowTitle, info->title_len );
     copy_unicode_string( &src, &dst, &params->Desktop, info->desktop_len );
     copy_unicode_string( &src, &dst, &params->ShellInfo, info->shellinfo_len );

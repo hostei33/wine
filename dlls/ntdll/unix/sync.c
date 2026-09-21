@@ -1070,7 +1070,6 @@ NTSTATUS WINAPI NtReleaseSemaphore( HANDLE handle, ULONG count, ULONG *previous 
         return esync_release_semaphore( handle, count, previous );
 
     TRACE( "handle %p, count %u, prev_count %p\n", handle, count, previous );
-
     if ((ret = inproc_release_semaphore( handle, count, previous )) != STATUS_NOT_IMPLEMENTED)
         return ret;
 
@@ -1167,7 +1166,6 @@ NTSTATUS WINAPI NtSetEvent( HANDLE handle, LONG *prev_state )
         return esync_set_event( handle );
 
     TRACE( "handle %p, prev_state %p\n", handle, prev_state );
-
     if ((ret = inproc_set_event( handle, prev_state )) != STATUS_NOT_IMPLEMENTED)
         return ret;
 
@@ -1203,9 +1201,7 @@ NTSTATUS WINAPI NtResetEvent( HANDLE handle, LONG *prev_state )
     if (do_esync())
         return esync_reset_event( handle );
 
-
     TRACE( "handle %p, prev_state %p\n", handle, prev_state );
-
     if ((ret = inproc_reset_event( handle, prev_state )) != STATUS_NOT_IMPLEMENTED)
         return ret;
 
@@ -1242,7 +1238,6 @@ NTSTATUS WINAPI NtPulseEvent( HANDLE handle, LONG *prev_state )
         return esync_pulse_event( handle );
 
     TRACE( "handle %p, prev_state %p\n", handle, prev_state );
-
     if ((ret = inproc_pulse_event( handle, prev_state )) != STATUS_NOT_IMPLEMENTED)
         return ret;
 
@@ -1377,7 +1372,6 @@ NTSTATUS WINAPI NtReleaseMutant( HANDLE handle, LONG *prev_count )
         return esync_release_mutex( handle, prev_count );
 
     TRACE( "handle %p, prev_count %p\n", handle, prev_count );
-
     if ((ret = inproc_release_mutex( handle, prev_count )) != STATUS_NOT_IMPLEMENTED)
         return ret;
 

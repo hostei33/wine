@@ -50,7 +50,7 @@ static const struct vulkan_driver_funcs x11drv_vulkan_driver_funcs;
 static VkResult X11DRV_vulkan_surface_create( HWND hwnd, const struct vulkan_instance *instance, VkSurfaceKHR *handle,
                                               struct client_surface **client )
 {
-    char *gpu_info = NULL;
+    const char *gpu_info = NULL;
 
     VkXlibSurfaceCreateInfoKHR info =
     {
@@ -65,6 +65,7 @@ static VkResult X11DRV_vulkan_surface_create( HWND hwnd, const struct vulkan_ins
         VkPhysicalDevice physical_device;
         VkPhysicalDeviceProperties properties;
         uint32_t device_count = 1;
+
         instance->p_vkEnumeratePhysicalDevices( instance->host.instance, &device_count, &physical_device );
         instance->p_vkGetPhysicalDeviceProperties( physical_device, &properties );
         gpu_info = properties.deviceName;

@@ -298,7 +298,7 @@ static NTSTATUS create_esync( enum esync_type type, HANDLE *handle, ACCESS_MASK 
     if ((ret = alloc_object_attributes( attr, &objattr, &len ))) return ret;
 
     /* We have to synchronize on the fd cache CS so that our calls to
-      * wine_server_receive_fd don't race with theirs. */
+     * wine_server_receive_fd don't race with theirs. */
     server_enter_uninterrupted_section( &fd_cache_mutex, &sigset );
     SERVER_START_REQ( create_esync )
     {

@@ -1540,7 +1540,11 @@ static NTSTATUS ipv4_forward_enumerate_all( void *key_data, UINT key_size, void 
         }
         freeifaddrs( addrs );
 
-        if (!(fp = fopen( "/proc/net/route", "r" ))) return STATUS_NOT_SUPPORTED;
+        if (!(fp = fopen( "/proc/net/route", "r" )))
+        {
+            *count = 0;
+            return STATUS_SUCCESS;
+        }
 
         /* skip header line */
         fgets( buf, sizeof(buf), fp );

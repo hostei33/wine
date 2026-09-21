@@ -51,11 +51,9 @@ extern NTSTATUS esync_signal_and_wait( HANDLE signal, HANDLE wait, BOOLEAN alert
     const LARGE_INTEGER *timeout );
 
 
-/* We have to synchronize on the fd cache mutex so that our calls to wine_server_receive_fd
- * don't race with theirs. It looks weird, I know.
+/* We have to synchronize on the fd cache mutex so that our calls to
+ * wine_server_receive_fd don't race with theirs. It looks weird, I know.
  *
  * If we weren't trying to avoid touching the code I'd rename the mutex to
  * "server_fd_mutex" or something similar. */
 extern pthread_mutex_t fd_cache_mutex;
-
-

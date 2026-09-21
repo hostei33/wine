@@ -361,7 +361,7 @@ extern void set_dc_drawable( HDC hdc, Drawable drawable, const RECT *rect, int m
 extern Drawable get_dc_drawable( HDC hdc, RECT *rect );
 extern HRGN get_dc_monitor_region( HWND hwnd, HDC hdc );
 extern Window x11drv_client_surface_create( HWND hwnd, const XVisualInfo *visual, Colormap colormap,
-                                            const char *gpu_info, struct client_surface **client );
+                                             const char *gpu_info, struct client_surface **client );
 
 /**************************************************************************
  * X11 USER driver

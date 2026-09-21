@@ -3195,6 +3195,9 @@ DECL_HANDLER(get_queue_status)
     SHARED_WRITE_END;
 
     if (!get_queue_status( queue )) reset_sync( queue->sync );
+
+    if (do_esync() && !get_queue_status( queue ))
+        esync_clear( queue->esync_fd );
 }
 
 

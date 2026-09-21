@@ -761,6 +761,9 @@ static inline void set_queue_bits( struct msg_queue *queue, unsigned int bits )
     SHARED_WRITE_END;
 
     if (get_queue_status( queue )) signal_sync( queue->sync );
+
+    if (do_esync() && get_queue_status( queue ))
+        esync_wake_up( &queue->obj );
 }
 
 /* clear some queue bits */
@@ -3164,8 +3167,11 @@ DECL_HANDLER(set_queue_mask)
     if (!get_queue_status( queue )) reset_sync( queue->sync );
     else signal_sync( queue->sync );
 
-    if (do_esync() && !get_queue_status( queue ))
-        esync_clear( queue->esync_fd );
+    if (do_esync())
+    {
+        if (!get_queue_status( queue )) esync_clear( queue->esync_fd );
+        else esync_wake_up( &queue->obj );
+    }
 }
 
 
@@ -3465,8 +3471,11 @@ DECL_HANDLER(get_message)
     else signal_sync( queue->sync );
     set_error( STATUS_PENDING );  /* FIXME */
 
-    if (do_esync() && !get_queue_status( queue ))
-        esync_clear( queue->esync_fd );
+    if (do_esync())
+    {
+        if (!get_queue_status( queue )) esync_clear( queue->esync_fd );
+        else esync_wake_up( &queue->obj );
+    }
 
     return;
 

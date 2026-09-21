@@ -3755,6 +3755,11 @@ NTSTATUS create_reparse_target( int dirfd, const char *unix_src, int depth, cons
             status = get_nt_and_unix_names( &attr, &nt_name, &unix_path, FILE_OPEN_IF );
             free( nt_name.Buffer );
         }
+        if (status != STATUS_SUCCESS && status != STATUS_NO_SUCH_FILE)
+        {
+            free( nt_path );
+            return status;
+        }
     }
     else
     {

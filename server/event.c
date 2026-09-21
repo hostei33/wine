@@ -157,6 +157,7 @@ struct event
     struct object      obj;             /* object header */
     struct object     *sync;            /* event sync object */
     struct list        kernel_object;   /* list of kernel object pointers */
+    int                manual_reset;    /* is it a manual reset event? */
     int                esync_fd;        /* esync file descriptor */
 };
 
@@ -256,6 +257,7 @@ struct event *create_event( struct object *root, const struct unicode_str *name,
             /* initialize it if it didn't already exist */
             event->sync = NULL;
             list_init( &event->kernel_object );
+            event->manual_reset = manual_reset;
 
             if (!(event->sync = create_event_sync( manual_reset, initial_state )))
             {
@@ -321,12 +323,7 @@ static struct object *event_get_sync( struct object *obj )
 static int event_get_esync_fd( struct object *obj, enum esync_type *type )
 {
     struct event *event = (struct event *)obj;
-    struct event_sync *sync;
-
-    assert( event->sync->ops == &event_sync_ops ); /* never called with inproc syncs */
-    sync = (struct event_sync *)event->sync;
-
-    *type = sync->manual ? ESYNC_MANUAL_SERVER : ESYNC_AUTO_SERVER;
+    *type = event->manual_reset ? ESYNC_MANUAL_SERVER : ESYNC_AUTO_SERVER;
     return event->esync_fd;
 }
 

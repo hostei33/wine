@@ -1018,6 +1018,7 @@ static void process_killed( struct process *process )
     release_job_process( process );
     start_sigkill_timer( process );
     signal_sync( process->sync );
+    if (do_esync()) esync_wake_up( &process->obj );
 }
 
 /* add a thread to a process running threads list */

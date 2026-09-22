@@ -1010,7 +1010,7 @@ BOOLEAN WINAPI /* DECLSPEC_HOTPATCH */ CreateSymbolicLinkW( LPCWSTR link, LPCWST
     HANDLE hlink;
     DWORD dwret;
 
-    TRACE( "(%s %s %ld): stub\n", debugstr_w(link), debugstr_w(target), flags );
+    TRACE( "(%s %s %ld)\n", debugstr_w(link), debugstr_w(target), flags );
 
     is_relative = (RtlDetermineDosPathNameType_U( target ) == RtlPathTypeRelative);
     is_dir = (flags & SYMBOLIC_LINK_FLAG_DIRECTORY);
@@ -1047,7 +1047,6 @@ BOOLEAN WINAPI /* DECLSPEC_HOTPATCH */ CreateSymbolicLinkW( LPCWSTR link, LPCWST
         len = target_path_len + (lstrlenW( target ) + 1);
         target_path = HeapAlloc( GetProcessHeap(), HEAP_ZERO_MEMORY, len*sizeof(WCHAR) );
         lstrcpynW( target_path, nt_path.Buffer, target_path_len+1 );
-        target_path[target_path_len+1] = 0;
         lstrcatW( target_path, target );
         RtlFreeUnicodeString( &nt_path );
     }

@@ -50,6 +50,8 @@ static const struct vulkan_driver_funcs x11drv_vulkan_driver_funcs;
 static VkResult X11DRV_vulkan_surface_create( HWND hwnd, const struct vulkan_instance *instance, VkSurfaceKHR *handle,
                                               struct client_surface **client )
 {
+    const char *gpu_info = NULL;
+
     VkXlibSurfaceCreateInfoKHR info =
     {
         .sType = VK_STRUCTURE_TYPE_XLIB_SURFACE_CREATE_INFO_KHR,
@@ -58,7 +60,18 @@ static VkResult X11DRV_vulkan_surface_create( HWND hwnd, const struct vulkan_ins
 
     TRACE( "%p %p %p %p\n", hwnd, instance, handle, client );
 
-    if (!(info.window = x11drv_client_surface_create( hwnd, 0, client ))) return VK_ERROR_OUT_OF_HOST_MEMORY;
+    if (wnd_gpu_info)
+    {
+        VkPhysicalDevice physical_device;
+        VkPhysicalDeviceProperties properties;
+        uint32_t device_count = 1;
+
+        instance->p_vkEnumeratePhysicalDevices( instance->host.instance, &device_count, &physical_device );
+        instance->p_vkGetPhysicalDeviceProperties( physical_device, &properties );
+        gpu_info = properties.deviceName;
+    }
+
+    if (!(info.window = x11drv_client_surface_create( hwnd, 0, gpu_info, client ))) return VK_ERROR_OUT_OF_HOST_MEMORY;
     if (instance->p_vkCreateXlibSurfaceKHR( instance->host.instance, &info, NULL /* allocator */, handle ))
     {
         ERR("Failed to create Xlib surface\n");

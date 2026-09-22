@@ -2381,7 +2381,6 @@ void default_fd_reselect_async( struct fd *fd, struct async_queue *queue )
 
 static int is_dir_empty( int fd )
 {
-    int dir_fd;
     DIR *dir;
     int empty;
     struct dirent *de;
@@ -2389,13 +2388,8 @@ static int is_dir_empty( int fd )
     if ((fd = dup( fd )) == -1)
         return -1;
 
-    /* use openat() so that if 'fd' was opened with O_SYMLINK we can still check the contents */
-    dir_fd = openat( fd, ".", O_RDONLY | O_DIRECTORY | O_NONBLOCK );
-    if (dir_fd == -1)
-        return -1;
-    if (!(dir = fdopendir( dir_fd )))
+    if (!(dir = fdopendir( fd )))
     {
-        close( dir_fd );
         close( fd );
         return -1;
     }
@@ -2407,7 +2401,6 @@ static int is_dir_empty( int fd )
         empty = 0;
     }
     closedir( dir );
-    close( dir_fd );
     return empty;
 }
 

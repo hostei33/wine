@@ -3972,7 +3972,10 @@ BOOL WCMD_create_junction(WCHAR *link, WCHAR *target) {
         return FALSE;
     status = RtlDosPathNameToNtPathName_U_WithStatus(target, &nt_name, NULL, NULL);
     if (status)
+    {
+        CloseHandle(hlink);
         return FALSE;
+    }
     prefix_len = strlen("\\??\\");
     string = nt_name.Buffer;
     string_len = lstrlenW( &string[prefix_len] );
@@ -3992,6 +3995,7 @@ BOOL WCMD_create_junction(WCHAR *link, WCHAR *target) {
     ret = DeviceIoControl(hlink, FSCTL_SET_REPARSE_POINT, (LPVOID)buffer, buffer_size, NULL, 0,
                           &dwret, 0 );
     HeapFree(GetProcessHeap(), 0, buffer);
+    CloseHandle(hlink);
     return ret;
 }
 

@@ -31,6 +31,8 @@
 #include <unistd.h>
 #include <dlfcn.h>
 #include <limits.h>
+#include <spawn.h>
+#include <wait.h>
 #ifdef HAVE_SYS_SYSCTL_H
 # include <sys/sysctl.h>
 #endif
@@ -174,6 +176,31 @@ static void *try_dlopen( const char *argv0 )
 int main( int argc, char *argv[] )
 {
     void *handle;
+
+    if (getenv( "WINPREEXEC" ) && argc > 1)
+    {
+        pid_t pid = fork();
+        if (pid < 0)
+        {
+            fprintf( stderr, "wine: fork failed\n" );
+            exit(1);
+        }
+        else if (pid == 0)
+        {
+            char *preexec = getenv( "WINPREEXEC" );
+            char *new_argv[] = { preexec, argv[1], NULL };
+
+            execvp( preexec, new_argv );
+            fprintf( stderr, "wine: could not pre exec %s\n", preexec );
+            exit(1);
+        }
+        else
+        {
+            int status;
+            waitpid( pid, &status, 0 );
+            if (WIFEXITED(status) && WEXITSTATUS(status) == 2) exit(1);
+        }
+    }
 
     init_reserved_areas();
 

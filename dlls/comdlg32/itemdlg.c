@@ -2346,20 +2346,22 @@ static LRESULT on_new_folder(FileDialogImpl *This)
 
     TRACE("%p\n", This);
 
-    IExplorerBrowser_GetCurrentView(This->peb, &IID_IShellView, (void**)&psv);
-    if(SUCCEEDED(IShellView_GetItemObject(psv, SVGIO_BACKGROUND, &IID_IContextMenu, (LPVOID*)&pcm)))
+    if (This->peb && SUCCEEDED(IExplorerBrowser_GetCurrentView(This->peb, &IID_IShellView, (void**)&psv)))
     {
-        CMINVOKECOMMANDINFO ci;
-        ZeroMemory(&ci, sizeof(CMINVOKECOMMANDINFO));
-        ci.cbSize = sizeof(CMINVOKECOMMANDINFO);
-        ci.lpVerb = CMDSTR_NEWFOLDERA;
-        ci.hwnd = This->dlg_hwnd;
+        if (SUCCEEDED(IShellView_GetItemObject(psv, SVGIO_BACKGROUND, &IID_IContextMenu, (LPVOID*)&pcm)))
+        {
+            CMINVOKECOMMANDINFO ci;
+            ZeroMemory(&ci, sizeof(CMINVOKECOMMANDINFO));
+            ci.cbSize = sizeof(CMINVOKECOMMANDINFO);
+            ci.lpVerb = CMDSTR_NEWFOLDERA;
+            ci.hwnd = This->dlg_hwnd;
 
-        IContextMenu_InvokeCommand(pcm, &ci);
-        IContextMenu_Release(pcm);
+            IContextMenu_InvokeCommand(pcm, &ci);
+            IContextMenu_Release(pcm);
+        }
+
+        IShellView_Release(psv);
     }
-
-    IShellView_Release(psv);
     return FALSE;
 }
 

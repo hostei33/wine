@@ -755,7 +755,6 @@ failed:
     return NULL;
 }
 
-
 /***********************************************************************
  *              create_icon_pixmaps
  */
@@ -1019,6 +1018,7 @@ static void set_style_hints( struct x11drv_win_data *data, DWORD style, DWORD ex
     HWND owner = NtUserGetWindowRelative( data->hwnd, GW_OWNER );
     Window owner_win = 0;
     XWMHints *wm_hints;
+    int WindowLayeredHint = data->layered ? (1 << 16) : 0;
     Atom window_type;
 
     if (owner)
@@ -1049,7 +1049,7 @@ static void set_style_hints( struct x11drv_win_data *data, DWORD style, DWORD ex
 
     if ((wm_hints = XAllocWMHints()))
     {
-        wm_hints->flags = InputHint | StateHint | WindowGroupHint;
+        wm_hints->flags = InputHint | StateHint | WindowGroupHint | WindowLayeredHint;
         wm_hints->input = !use_take_focus && !(style & WS_DISABLED);
         wm_hints->initial_state = (style & WS_MINIMIZE) ? IconicState : NormalState;
         wm_hints->window_group = group_leader;
@@ -1080,7 +1080,6 @@ static void set_style_hints( struct x11drv_win_data *data, DWORD style, DWORD ex
                data->whole_window, NextRequest( data->display ) );
         XDeleteProperty( data->display, data->whole_window, x11drv_atom(_NET_WM_ICON) );
     }
-
 }
 
 
@@ -1089,12 +1088,15 @@ static void set_style_hints( struct x11drv_win_data *data, DWORD style, DWORD ex
  *
  * Set the window manager hints that don't change over the lifetime of a window.
  */
-static void set_initial_wm_hints( Display *display, Window window )
+static void set_initial_wm_hints( Display *display, Window window, HWND hwnd )
 {
     long i;
+    DWORD pid = 0;
     Atom protocols[3];
+    BOOL is_wow64 = FALSE;
     Atom dndVersion = WINE_XDND_VERSION;
     XClassHint *class_hints;
+    ULONG_PTR pbi;
 
     /* wm protocols */
     i = 0;
@@ -1114,14 +1116,21 @@ static void set_initial_wm_hints( Display *display, Window window )
     }
 
     /* set the WM_CLIENT_MACHINE and WM_LOCALE_NAME properties */
-    XSetWMProperties(display, window, NULL, NULL, NULL, 0, NULL, NULL, NULL);
-    /* set the pid. together, these properties are needed so the window manager can kill us if we freeze */
-    i = getpid();
-    XChangeProperty(display, window, x11drv_atom(_NET_WM_PID),
-                    XA_CARDINAL, 32, PropModeReplace, (unsigned char *)&i, 1);
+    XSetWMProperties( display, window, NULL, NULL, NULL, 0, NULL, NULL, NULL );
+
+    pid = GetCurrentProcessId();
+    XChangeProperty( display, window, x11drv_atom(_NET_WM_PID ),
+                    XA_CARDINAL, 32, PropModeReplace, (unsigned char *)&pid, 1);
+
+    if (!NtQueryInformationProcess( GetCurrentProcess(), ProcessWow64Information, &pbi, sizeof(pbi), NULL )) is_wow64 = !!pbi;
+    XChangeProperty( display, window, x11drv_atom(_NET_WM_WOW64),
+                     XA_CARDINAL, 8, PropModeReplace, (unsigned char *)&is_wow64, 1 );
 
     XChangeProperty( display, window, x11drv_atom(XdndAware),
                      XA_ATOM, 32, PropModeReplace, (unsigned char*)&dndVersion, 1 );
+
+    XChangeProperty( display, window, x11drv_atom(_NET_WM_HWND),
+                     XA_CARDINAL, 32, PropModeReplace, (unsigned char *)&hwnd, 2 );
 }
 
 
@@ -1262,8 +1271,9 @@ static void update_net_wm_fullscreen_monitors( struct x11drv_win_data *data )
 static void window_set_net_wm_state( struct x11drv_win_data *data, UINT new_state )
 {
     UINT i, count, old_state = data->pending_state.net_wm_state;
+    struct x11drv_thread_data *thread_data = x11drv_thread_data();
 
-    new_state &= x11drv_thread_data()->net_wm_state_mask;
+    if (thread_data) new_state &= thread_data->net_wm_state_mask;
     data->desired_state.net_wm_state = new_state;
     if (!data->whole_window || !data->managed || data->embedded) return; /* no window or not managed, nothing to update */
     if (data->wm_state_serial) return; /* another WM_STATE update is pending, wait for it to complete */
@@ -2265,7 +2275,7 @@ void destroy_client_window( HWND hwnd, Window client_window )
 /**********************************************************************
  *		create_client_window
  */
-Window create_client_window( HWND hwnd, const XVisualInfo *visual, Colormap colormap )
+Window create_client_window( HWND hwnd, const XVisualInfo *visual, Colormap colormap, const char *gpu_info )
 {
     struct x11drv_win_data *data = get_win_data( hwnd );
     XSetWindowAttributes attr;
@@ -2306,6 +2316,16 @@ Window create_client_window( HWND hwnd, const XVisualInfo *visual, Colormap colo
                                                CWBackingStore | CWColormap | CWBorderPixel, &attr );
     if (data->client_window)
     {
+        const BOOL is_surface = TRUE;
+        XChangeProperty( gdi_display, data->client_window, x11drv_atom(_NET_WM_SURFACE),
+                         XA_CARDINAL, 8, PropModeReplace, (unsigned char *)&is_surface, 1 );
+
+        if (gpu_info)
+        {
+            XChangeProperty( gdi_display, data->client_window, x11drv_atom(_NET_WM_GPU_INFO),
+                             XA_CARDINAL, 8, PropModeReplace, (unsigned char *)gpu_info, strlen(gpu_info) );
+        }
+
         XMapWindow( gdi_display, data->client_window );
         if (data->whole_window)
         {
@@ -2365,7 +2385,7 @@ static void create_whole_window( struct x11drv_win_data *data )
     data->desired_state.rect = data->current_state.rect;
 
     x11drv_xinput2_enable( data->display, data->whole_window );
-    set_initial_wm_hints( data->display, data->whole_window );
+    set_initial_wm_hints( data->display, data->whole_window, data->hwnd );
     set_wm_hints( data );
 
     XSaveContext( data->display, data->whole_window, winContext, (char *)data->hwnd );
@@ -2548,8 +2568,8 @@ void X11DRV_DestroyWindow( HWND hwnd )
     if (thread_data->last_xic_hwnd == hwnd) thread_data->last_xic_hwnd = 0;
     if (data->icon_pixmap) XFreePixmap( gdi_display, data->icon_pixmap );
     if (data->icon_mask) XFreePixmap( gdi_display, data->icon_mask );
-    if (data->parent) host_window_release( data->parent );
     free( data->icon_bits );
+    if (data->parent) host_window_release( data->parent );
     XDeleteContext( gdi_display, (XID)hwnd, win_data_context );
     release_win_data( data );
     free( data );
@@ -2586,7 +2606,7 @@ static BOOL create_desktop_win_data( Window win, HWND hwnd )
     data->whole_window = win;
     window_set_managed( data, TRUE );
     NtUserSetProp( data->hwnd, whole_window_prop, (HANDLE)win );
-    set_initial_wm_hints( display, win );
+    set_initial_wm_hints( display, win, data->hwnd );
     if (is_desktop_fullscreen()) window_set_net_wm_state( data, (1 << NET_WM_STATE_FULLSCREEN) );
     release_win_data( data );
     if (thread_data->clip_window) XReparentWindow( display, thread_data->clip_window, win, 0, 0 );

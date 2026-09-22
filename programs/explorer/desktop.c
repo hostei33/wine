@@ -43,6 +43,7 @@ WINE_DEFAULT_DEBUG_CHANNEL(explorer);
 static const WCHAR default_driver[] = L"mac,x11,wayland";
 
 static BOOL using_root = TRUE;
+static BOOL nogui = FALSE;
 
 struct launcher
 {
@@ -293,7 +294,7 @@ static WCHAR *append_path( const WCHAR *path, const WCHAR *filename, int len_fil
     return ret;
 }
 
-static IShellLinkW *load_shelllink( const WCHAR *path )
+IShellLinkW *load_shelllink( const WCHAR *path )
 {
     HRESULT hr;
     IShellLinkW *link;
@@ -319,7 +320,7 @@ static IShellLinkW *load_shelllink( const WCHAR *path )
     return link;
 }
 
-static HICON extract_icon( IShellLinkW *link )
+HICON extract_icon( IShellLinkW *link, BOOL large_icon )
 {
     WCHAR tmp_path[MAX_PATH], icon_path[MAX_PATH], target_path[MAX_PATH];
     HICON icon = NULL;
@@ -329,13 +330,13 @@ static HICON extract_icon( IShellLinkW *link )
     IShellLinkW_GetIconLocation( link, tmp_path, MAX_PATH, &index );
     ExpandEnvironmentStringsW( tmp_path, icon_path, MAX_PATH );
 
-    if (icon_path[0]) ExtractIconExW( icon_path, index, &icon, NULL, 1 );
+    if (icon_path[0]) ExtractIconExW( icon_path, index, large_icon ? &icon : NULL, !large_icon ? &icon : NULL, 1 );
     if (!icon)
     {
         tmp_path[0] = 0;
         IShellLinkW_GetPath( link, tmp_path, MAX_PATH, NULL, SLGP_RAWPATH );
         ExpandEnvironmentStringsW( tmp_path, target_path, MAX_PATH );
-        ExtractIconExW( target_path, index, &icon, NULL, 1 );
+        ExtractIconExW( target_path, index, large_icon ? &icon : NULL, !large_icon ? &icon : NULL, 1 );
     }
     return icon;
 }
@@ -378,7 +379,7 @@ static BOOL add_launcher( const WCHAR *folder, const WCHAR *filename, int len_fi
     if (!(launcher->path = append_path( folder, filename, len_filename ))) goto error;
     if (!(link = load_shelllink( launcher->path ))) goto error;
 
-    launcher->icon = extract_icon( link );
+    launcher->icon = extract_icon( link, TRUE );
     launcher->title = build_title( filename, len_filename );
     IShellLinkW_Release( link );
     if (launcher->icon && launcher->title)
@@ -816,7 +817,7 @@ static LRESULT WINAPI desktop_wnd_proc( HWND hwnd, UINT message, WPARAM wp, LPAR
         return HTCLIENT;
 
     case WM_ERASEBKGND:
-        if (!using_root) PaintDesktop( (HDC)wp );
+        if (!using_root && !nogui) PaintDesktop( (HDC)wp );
         return TRUE;
 
     case WM_SETTINGCHANGE:
@@ -829,7 +830,7 @@ static LRESULT WINAPI desktop_wnd_proc( HWND hwnd, UINT message, WPARAM wp, LPAR
         return 0;
 
     case WM_LBUTTONDBLCLK:
-        if (!using_root)
+        if (!using_root && !nogui)
         {
             const struct launcher *launcher = launcher_from_point( (short)LOWORD(lp), (short)HIWORD(lp) );
             if (launcher) ShellExecuteW( NULL, L"open", launcher->path, NULL, NULL, 0 );
@@ -840,7 +841,7 @@ static LRESULT WINAPI desktop_wnd_proc( HWND hwnd, UINT message, WPARAM wp, LPAR
         {
             PAINTSTRUCT ps;
             BeginPaint( hwnd, &ps );
-            if (!using_root)
+            if (!using_root && !nogui)
             {
                 PaintDesktop( ps.hdc );
                 draw_launchers( ps.hdc, ps.rcPaint );
@@ -920,6 +921,9 @@ static BOOL get_default_enable_shell( const WCHAR *name )
     BOOL result;
     DWORD size = sizeof(result);
 
+    /* For the magic desktop name "shell" return TRUE */
+    if (!lstrcmpiW( name, L"shell" )) return TRUE;    
+
     /* @@ Wine registry key: HKCU\Software\Wine\Explorer\Desktops */
     if (!RegOpenKeyW( HKEY_CURRENT_USER, L"Software\\Wine\\Explorer\\Desktops", &hkey ))
     {
@@ -927,7 +931,8 @@ static BOOL get_default_enable_shell( const WCHAR *name )
             found = TRUE;
         RegCloseKey( hkey );
     }
-    /* Default off, except for the magic desktop name "shell" */
+
+    /* Default off */
     if (!found) result = (lstrcmpiW( name, L"shell" ) == 0);
     return result;
 }
@@ -1239,9 +1244,15 @@ void manage_desktop( WCHAR *arg )
         if (!get_default_desktop_size( name, &width, &height )) width = height = 0;
     }
 
-    enable_shell = name ? get_default_enable_shell( name ) : FALSE;
-    enable_launchers = get_default_enable_launchers();
-    show_systray = get_default_show_systray( name );
+    if (name)
+    {
+        nogui = !wcsicmp( name, L"nogui" );
+        enable_shell = nogui || get_default_enable_shell( name );
+    }
+    else enable_shell = FALSE;
+
+    enable_launchers = !nogui && get_default_enable_launchers();
+    show_systray = !nogui && get_default_show_systray( name );
     no_tray_items = get_no_tray_items_display();
 
     UuidCreate( &guid );
@@ -1278,7 +1289,7 @@ void manage_desktop( WCHAR *arg )
 
         desktop_orig_wndproc = (WNDPROC)SetWindowLongPtrW( hwnd, GWLP_WNDPROC,
             (LONG_PTR)desktop_wnd_proc );
-        SendMessageW( hwnd, WM_SETICON, ICON_BIG, (LPARAM)LoadIconW( 0, MAKEINTRESOURCEW(OIC_WINLOGO)));
+
         if (name) set_desktop_window_title( hwnd, name );
         SetWindowPos( hwnd, 0, GetSystemMetrics(SM_XVIRTUALSCREEN), GetSystemMetrics(SM_YVIRTUALSCREEN),
                       GetSystemMetrics(SM_CXVIRTUALSCREEN), GetSystemMetrics(SM_CYVIRTUALSCREEN),

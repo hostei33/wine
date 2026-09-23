@@ -47,6 +47,8 @@ static pthread_once_t init_once = PTHREAD_ONCE_INIT;
 static const struct user_driver_funcs x11drv_funcs;
 static const struct gdi_dc_funcs *xrender_funcs;
 
+BOOL wnd_gpu_info = FALSE;
+
 
 void init_recursive_mutex( pthread_mutex_t *mutex )
 {
@@ -75,6 +77,8 @@ static void device_init(void)
     palette_size = X11DRV_PALETTE_Init();
 
     stock_bitmap_pixmap = XCreatePixmap( gdi_display, root_window, 1, 1, 1 );
+
+    wnd_gpu_info = getenv( "X11_WND_GPU_INFO" ) && atoi( getenv( "X11_WND_GPU_INFO" ) );
 }
 
 
@@ -457,7 +461,7 @@ static int visual_class_alloc( int class )
     return class == PseudoColor || class == GrayScale || class == DirectColor ? AllocAll : AllocNone;
 }
 
-Window x11drv_client_surface_create( HWND hwnd, int format, struct client_surface **client )
+Window x11drv_client_surface_create( HWND hwnd, int format, const char *gpu_info, struct client_surface **client )
 {
     struct x11drv_client_surface *surface;
     XVisualInfo visual = default_visual;
@@ -473,7 +477,8 @@ Window x11drv_client_surface_create( HWND hwnd, int format, struct client_surfac
     surface->colormap = colormap;
 
     if (!NtUserGetClientRect( hwnd, &surface->rect, NtUserGetDpiForWindow( hwnd ) )) goto failed;
-    if (!(surface->window = create_client_window( hwnd, surface->rect, &visual, colormap ))) goto failed;
+    if (!(surface->window = create_client_window( hwnd, surface->rect, &visual, colormap,
+                                                  wnd_gpu_info ? gpu_info : NULL ))) goto failed;
 
     TRACE( "Created %s for client window %lx\n", debugstr_client_surface( &surface->client ), surface->window );
     *client = &surface->client;

@@ -101,6 +101,7 @@
 #include "handle.h"
 #include "process.h"
 #include "request.h"
+#include "esync.h"
 
 #include "winternl.h"
 #include "winioctl.h"
@@ -162,6 +163,7 @@ struct fd
     struct completion   *completion;  /* completion object attached to this fd */
     apc_param_t          comp_key;    /* completion key to set in completion events */
     unsigned int         comp_flags;  /* completion flags */
+    int                  esync_fd;    /* esync file descriptor */
 };
 
 static void fd_dump( struct object *obj, int verbose );
@@ -176,6 +178,7 @@ static const struct object_ops fd_ops =
     NULL,                     /* add_queue */
     NULL,                     /* remove_queue */
     NULL,                     /* signaled */
+    NULL,                     /* get_esync_fd */
     NULL,                     /* satisfied */
     no_signal,                /* signal */
     no_get_fd,                /* get_fd */
@@ -218,6 +221,7 @@ static const struct object_ops device_ops =
     no_add_queue,             /* add_queue */
     NULL,                     /* remove_queue */
     NULL,                     /* signaled */
+    NULL,                     /* get_esync_fd */
     NULL,                     /* satisfied */
     no_signal,                /* signal */
     no_get_fd,                /* get_fd */
@@ -259,6 +263,7 @@ static const struct object_ops inode_ops =
     no_add_queue,             /* add_queue */
     NULL,                     /* remove_queue */
     NULL,                     /* signaled */
+    NULL,                     /* get_esync_fd */
     NULL,                     /* satisfied */
     no_signal,                /* signal */
     no_get_fd,                /* get_fd */
@@ -304,6 +309,7 @@ static const struct object_ops file_lock_ops =
     NULL,                       /* add_queue */
     NULL,                       /* remove_queue */
     NULL,                       /* signaled */
+    NULL,                       /* get_esync_fd */
     NULL,                       /* satisfied */
     no_signal,                  /* signal */
     no_get_fd,                  /* get_fd */
@@ -1140,6 +1146,7 @@ static void inode_dump( struct object *obj, int verbose )
     fprintf( stderr, "\n" );
 }
 
+
 static void inode_destroy( struct object *obj )
 {
     struct inode *inode = (struct inode *)obj;
@@ -1611,6 +1618,9 @@ static void fd_destroy( struct object *obj )
         free( fd->unix_name );
     }
     if (fd->sync) release_object( fd->sync );
+
+    if (do_esync())
+        close( fd->esync_fd );
 }
 
 /* check if the desired access is possible without violating */
@@ -1726,6 +1736,7 @@ static struct fd *alloc_fd_object(void)
     fd->poll_index = -1;
     fd->completion = NULL;
     fd->comp_flags = 0;
+    fd->esync_fd   = -1;
     init_async_queue( &fd->read_q );
     init_async_queue( &fd->write_q );
     init_async_queue( &fd->wait_q );
@@ -1733,6 +1744,10 @@ static struct fd *alloc_fd_object(void)
     list_init( &fd->locks );
 
     if (!(fd->sync = create_internal_sync( 1, 1 ))) goto error;
+
+    if (do_esync())
+        fd->esync_fd = esync_create_fd( 1, 0 );
+
     if ((fd->poll_index = add_poll_user( fd )) == -1) goto error;
 
     return fd;
@@ -1769,6 +1784,7 @@ struct fd *alloc_pseudo_fd( const struct fd_ops *fd_user_ops, struct object *use
     fd->completion = NULL;
     fd->comp_flags = 0;
     fd->no_fd_status = STATUS_BAD_DEVICE_TYPE;
+    fd->esync_fd   = -1;
     init_async_queue( &fd->read_q );
     init_async_queue( &fd->write_q );
     init_async_queue( &fd->wait_q );
@@ -1780,6 +1796,10 @@ struct fd *alloc_pseudo_fd( const struct fd_ops *fd_user_ops, struct object *use
         release_object( fd );
         return NULL;
     }
+
+    if (do_esync())
+        fd->esync_fd = esync_create_fd( 0, 0 );
+
     return fd;
 }
 
@@ -2185,6 +2205,12 @@ void set_fd_signaled( struct fd *fd, int signaled )
     if (fd->comp_flags & FILE_SKIP_SET_EVENT_ON_HANDLE) return;
     if (signaled) signal_sync( fd->sync );
     else reset_sync( fd->sync );
+
+    if (do_esync() && fd->esync_fd != -1)
+    {
+        if (signaled) esync_wake_fd( fd->esync_fd );
+        else esync_clear( fd->esync_fd );
+    }
 }
 
 /* check if events are pending and if yes return which one(s) */
@@ -2223,6 +2249,15 @@ WCHAR *default_fd_get_full_name( struct object *obj, data_size_t max, data_size_
     }
     release_object( fd );
     if (*ret_len > max) set_error( STATUS_BUFFER_OVERFLOW );
+    return ret;
+}
+
+int default_fd_get_esync_fd( struct object *obj, enum esync_type *type )
+{
+    struct fd *fd = get_obj_fd( obj );
+    int ret = fd->esync_fd;
+    *type = ESYNC_MANUAL_SERVER;
+    release_object( fd );
     return ret;
 }
 

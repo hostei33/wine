@@ -1029,6 +1029,7 @@ static void add_system_dll_path_var( WCHAR **env, SIZE_T *pos, SIZE_T *size )
 static void add_dynamic_environment( WCHAR **env, SIZE_T *pos, SIZE_T *size )
 {
     unsigned int i;
+    char *extra_env;
     char str[22];
 
     if (build_dir) unix_to_nt_file_name( build_dir, &nt_build_dir, FILE_OPEN );
@@ -1057,6 +1058,14 @@ static void add_dynamic_environment( WCHAR **env, SIZE_T *pos, SIZE_T *size )
     append_envA( env, pos, size, "WINEUSERLOCALE", user_locale );
     append_envA( env, pos, size, "SystemDrive", "C:" );
     append_envA( env, pos, size, "SystemRoot", "C:\\windows" );
+
+    extra_env = getenv( "WINEENV" );
+    if (extra_env && strchr(extra_env, '='))
+    {
+        char *value = strchr(extra_env, '=') + 1;
+        *strchr(extra_env, '=') = '\0';
+        append_envA( env, pos, size, extra_env, value );
+    }
 }
 
 
@@ -1647,6 +1656,16 @@ static void copy_dos_path_string( WCHAR **src, WCHAR **dst, UNICODE_STRING *str,
     }
 }
 
+static inline void append_unicode_string( WCHAR *src, WCHAR **dst, UNICODE_STRING *str )
+{
+    UINT len = wcslen(src) * sizeof(WCHAR);
+    str->Length += len;
+    str->MaximumLength += len + sizeof(WCHAR);
+    memcpy( *dst, src, len );
+    (*dst)[len / sizeof(WCHAR)] = 0;
+    *dst += len / sizeof(WCHAR) + 1;
+}
+
 static inline WCHAR *get_dos_path( WCHAR *nt_path )
 {
     if (nt_path[4] && nt_path[5] == ':') return nt_path + 4; /* skip the \??\ prefix */
@@ -2008,10 +2027,11 @@ static RTL_USER_PROCESS_PARAMETERS *build_initial_params( void **module )
  */
 void init_startup_info(void)
 {
-    WCHAR *src, *dst, *env;
+    WCHAR *src, *dst, *env, *extra_args;
+    char *wine_args;
     void *module = NULL;
     unsigned int status;
-    SIZE_T size, info_size, env_size, env_pos;
+    SIZE_T size, info_size, env_size, env_pos, extra_args_len;
     RTL_USER_PROCESS_PARAMETERS *params = NULL;
     struct startup_info_data *info;
     UNICODE_STRING nt_name;
@@ -2044,11 +2064,25 @@ void init_startup_info(void)
     is_prefix_bootstrap = !!find_env_var( env, env_pos, bootstrapW, ARRAY_SIZE(bootstrapW) );
     env[env_pos++] = 0;
 
+    extra_args = NULL;
+    extra_args_len = 0;
+
+    wine_args = getenv( "WINEARGS" );
+    if (wine_args)
+    {
+        SIZE_T len = strlen(wine_args) + 1;
+        extra_args_len = len * sizeof(WCHAR);
+        extra_args = malloc( extra_args_len );
+        ntdll_umbstowcs( wine_args, len, extra_args + 1, len );
+        extra_args[0] = L' ';
+        unsetenv( "WINEARGS" );
+    }
+
     size = (sizeof(*params)
             + MAX_PATH * sizeof(WCHAR)  /* curdir */
             + info->dllpath_len + sizeof(WCHAR)
             + info->imagepath_len + sizeof(WCHAR)
-            + info->cmdline_len + sizeof(WCHAR)
+            + info->cmdline_len + extra_args_len + sizeof(WCHAR)
             + info->title_len + sizeof(WCHAR)
             + info->desktop_len + sizeof(WCHAR)
             + info->shellinfo_len + sizeof(WCHAR)
@@ -2089,7 +2123,19 @@ void init_startup_info(void)
 
     if (info->dllpath_len) copy_unicode_string( &src, &dst, &params->DllPath, info->dllpath_len );
     copy_dos_path_string( &src, &dst, &params->ImagePathName, &nt_name, info->imagepath_len );
-    copy_unicode_string( &src, &dst, &params->CommandLine, info->cmdline_len );
+
+    if (extra_args && info->cmdline_len > 0)
+    {
+        WCHAR *old = dst;
+        copy_unicode_string( &src, &dst, &params->CommandLine, info->cmdline_len );
+        dst = old + (info->cmdline_len / sizeof(WCHAR));
+        append_unicode_string( extra_args, &dst, &params->CommandLine );
+
+        free(extra_args);
+        extra_args = NULL;
+    }
+    else copy_unicode_string( &src, &dst, &params->CommandLine, info->cmdline_len );
+
     copy_unicode_string( &src, &dst, &params->WindowTitle, info->title_len );
     copy_unicode_string( &src, &dst, &params->Desktop, info->desktop_len );
     copy_unicode_string( &src, &dst, &params->ShellInfo, info->shellinfo_len );

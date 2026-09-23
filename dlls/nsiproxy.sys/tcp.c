@@ -189,82 +189,30 @@ struct ipv6_addr_scope *get_ipv6_addr_scope_table( unsigned int *size )
 {
     struct ipv6_addr_scope *table = NULL, *new_table;
     unsigned int table_size = 0, num = 0;
+    struct ifaddrs *addrs, *cur;
 
-#ifdef __linux__
+    if (!(addrs = read_ifaddrs_from_file()))  goto failed;
+
+    for (cur = addrs; cur; cur = cur->ifa_next)
     {
-        char buf[512], *ptr;
-        FILE *fp;
+        struct sockaddr_in6 *sin6;
+        struct ipv6_addr_scope *entry;
 
-        if (!(fp = fopen( "/proc/net/if_inet6", "r" ))) goto failed;
+        if (cur->ifa_addr->sa_family != AF_INET6) continue;
 
-        while ((ptr = fgets( buf, sizeof(buf), fp )))
+        if (++num > table_size)
         {
-            WORD a[8];
-            UINT scope;
-            struct ipv6_addr_scope *entry;
-            unsigned int i;
-
-            if (sscanf( ptr, "%4hx%4hx%4hx%4hx%4hx%4hx%4hx%4hx %*s %*s %x",
-                        a, a + 1, a + 2, a + 3, a + 4, a + 5, a + 6, a + 7, &scope ) != 9)
-                continue;
-
-            if (++num > table_size)
-            {
-                if (!table_size) table_size = 4;
-                else table_size *= 2;
-                if (!(new_table = realloc( table, table_size * sizeof(table[0]) )))
-                {
-                    fclose( fp );
-                    goto failed;
-                }
-                table = new_table;
-            }
-
-            entry = table + num - 1;
-            for (i = 0; i < 8; i++)
-                entry->addr.u.Word[i] = htons( a[i] );
-            entry->scope = htons( scope );
+            if (!table_size) table_size = 4;
+            else table_size *= 2;
+            if (!(new_table = realloc( table, table_size * sizeof(table[0]) ))) goto failed;
+            table = new_table;
         }
 
-        fclose( fp );
+        sin6 = (struct sockaddr_in6 *)cur->ifa_addr;
+        entry = table + num - 1;
+        memcpy( &entry->addr, &sin6->sin6_addr, sizeof(entry->addr) );
+        entry->scope = sin6->sin6_scope_id;
     }
-#elif defined(HAVE_GETIFADDRS)
-    {
-        struct ifaddrs *addrs, *cur;
-
-        if (getifaddrs( &addrs ) == -1)  goto failed;
-
-        for (cur = addrs; cur; cur = cur->ifa_next)
-        {
-            struct sockaddr_in6 *sin6;
-            struct ipv6_addr_scope *entry;
-
-            if (cur->ifa_addr->sa_family != AF_INET6) continue;
-
-            if (++num > table_size)
-            {
-                if (!table_size) table_size = 4;
-                else table_size *= 2;
-                if (!(new_table = realloc( table, table_size * sizeof(table[0]) )))
-                {
-                    freeifaddrs( addrs );
-                    goto failed;
-                }
-                table = new_table;
-            }
-
-            sin6 = (struct sockaddr_in6 *)cur->ifa_addr;
-            entry = table + num - 1;
-            memcpy( &entry->addr, &sin6->sin6_addr, sizeof(entry->addr) );
-            entry->scope = sin6->sin6_scope_id;
-        }
-
-        freeifaddrs( addrs );
-    }
-#else
-    FIXME( "not implemented\n" );
-    goto failed;
-#endif
 
     *size = num;
     return table;

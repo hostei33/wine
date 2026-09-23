@@ -1923,6 +1923,7 @@ enum server_fd_type
 {
     FD_TYPE_INVALID,
     FD_TYPE_FILE,
+    FD_TYPE_SYMLINK,
     FD_TYPE_DIR,
     FD_TYPE_SOCKET,
     FD_TYPE_SERIAL,
@@ -5962,6 +5963,78 @@ struct get_next_thread_reply
     char __pad_12[4];
 };
 
+enum esync_type
+{
+    ESYNC_SEMAPHORE = 1,
+    ESYNC_AUTO_EVENT,
+    ESYNC_MANUAL_EVENT,
+    ESYNC_MUTEX,
+    ESYNC_AUTO_SERVER,
+    ESYNC_MANUAL_SERVER,
+    ESYNC_QUEUE,
+};
+
+
+struct create_esync_request
+{
+    struct request_header __header;
+    unsigned int access;
+    int          initval;
+    int          type;
+    int          max;
+    /* VARARG(objattr,object_attributes); */
+    char __pad_28[4];
+};
+struct create_esync_reply
+{
+    struct reply_header __header;
+    obj_handle_t handle;
+    int          type;
+    unsigned int shm_idx;
+    char __pad_20[4];
+};
+
+struct open_esync_request
+{
+    struct request_header __header;
+    unsigned int access;
+    unsigned int attributes;
+    obj_handle_t rootdir;
+    int          type;
+    /* VARARG(name,unicode_str); */
+    char __pad_28[4];
+};
+struct open_esync_reply
+{
+    struct reply_header __header;
+    obj_handle_t handle;
+    int          type;
+    unsigned int shm_idx;
+    char __pad_20[4];
+};
+
+
+struct get_esync_fd_request
+{
+    struct request_header __header;
+    obj_handle_t handle;
+};
+struct get_esync_fd_reply
+{
+    struct reply_header __header;
+    int          type;
+    unsigned int shm_idx;
+};
+
+struct esync_msgwait_request
+{
+    struct request_header __header;
+    int          in_msgwait;
+};
+struct esync_msgwait_reply
+{
+    struct reply_header __header;
+};
 
 
 struct set_keyboard_repeat_request
@@ -5977,7 +6050,6 @@ struct set_keyboard_repeat_reply
     int enable;
     char __pad_12[4];
 };
-
 
 enum inproc_sync_type
 {
@@ -6154,6 +6226,17 @@ struct d3dkmt_mutex_release_request
     char __pad_36[4];
 };
 struct d3dkmt_mutex_release_reply
+{
+    struct reply_header __header;
+};
+
+
+struct get_esync_apc_fd_request
+{
+    struct request_header __header;
+    char __pad_12[4];
+};
+struct get_esync_apc_fd_reply
 {
     struct reply_header __header;
 };
@@ -6456,6 +6539,10 @@ enum request
     REQ_resume_process,
     REQ_get_next_process,
     REQ_get_next_thread,
+    REQ_create_esync,
+    REQ_open_esync,
+    REQ_get_esync_fd,
+    REQ_esync_msgwait,
     REQ_set_keyboard_repeat,
     REQ_get_inproc_sync_fd,
     REQ_get_inproc_alert_fd,
@@ -6467,6 +6554,7 @@ enum request
     REQ_d3dkmt_object_open_name,
     REQ_d3dkmt_mutex_acquire,
     REQ_d3dkmt_mutex_release,
+    REQ_get_esync_apc_fd,
     REQ_NB_REQUESTS
 };
 
@@ -6769,6 +6857,10 @@ union generic_request
     struct resume_process_request resume_process_request;
     struct get_next_process_request get_next_process_request;
     struct get_next_thread_request get_next_thread_request;
+    struct create_esync_request create_esync_request;
+    struct open_esync_request open_esync_request;
+    struct get_esync_fd_request get_esync_fd_request;
+    struct esync_msgwait_request esync_msgwait_request;
     struct set_keyboard_repeat_request set_keyboard_repeat_request;
     struct get_inproc_sync_fd_request get_inproc_sync_fd_request;
     struct get_inproc_alert_fd_request get_inproc_alert_fd_request;
@@ -6780,6 +6872,7 @@ union generic_request
     struct d3dkmt_object_open_name_request d3dkmt_object_open_name_request;
     struct d3dkmt_mutex_acquire_request d3dkmt_mutex_acquire_request;
     struct d3dkmt_mutex_release_request d3dkmt_mutex_release_request;
+    struct get_esync_apc_fd_request get_esync_apc_fd_request;
 };
 union generic_reply
 {
@@ -7080,6 +7173,10 @@ union generic_reply
     struct resume_process_reply resume_process_reply;
     struct get_next_process_reply get_next_process_reply;
     struct get_next_thread_reply get_next_thread_reply;
+    struct create_esync_reply create_esync_reply;
+    struct open_esync_reply open_esync_reply;
+    struct get_esync_fd_reply get_esync_fd_reply;
+    struct esync_msgwait_reply esync_msgwait_reply;
     struct set_keyboard_repeat_reply set_keyboard_repeat_reply;
     struct get_inproc_sync_fd_reply get_inproc_sync_fd_reply;
     struct get_inproc_alert_fd_reply get_inproc_alert_fd_reply;
@@ -7091,6 +7188,7 @@ union generic_reply
     struct d3dkmt_object_open_name_reply d3dkmt_object_open_name_reply;
     struct d3dkmt_mutex_acquire_reply d3dkmt_mutex_acquire_reply;
     struct d3dkmt_mutex_release_reply d3dkmt_mutex_release_reply;
+    struct get_esync_apc_fd_reply get_esync_apc_fd_reply;
 };
 
 #define SERVER_PROTOCOL_VERSION 930

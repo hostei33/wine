@@ -65,10 +65,14 @@ static VkResult X11DRV_vulkan_surface_create( HWND hwnd, const struct vulkan_ins
         VkPhysicalDevice physical_device;
         VkPhysicalDeviceProperties properties;
         uint32_t device_count = 1;
+        VkResult vr;
 
-        instance->p_vkEnumeratePhysicalDevices( instance->host.instance, &device_count, &physical_device );
-        instance->p_vkGetPhysicalDeviceProperties( physical_device, &properties );
-        gpu_info = properties.deviceName;
+        vr = instance->p_vkEnumeratePhysicalDevices( instance->host.instance, &device_count, &physical_device );
+        if (vr == VK_SUCCESS && device_count)
+        {
+            instance->p_vkGetPhysicalDeviceProperties( physical_device, &properties );
+            gpu_info = properties.deviceName;
+        }
     }
 
     if (!(info.window = x11drv_client_surface_create( hwnd, 0, gpu_info, client ))) return VK_ERROR_OUT_OF_HOST_MEMORY;

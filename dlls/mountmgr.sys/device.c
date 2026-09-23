@@ -198,6 +198,7 @@ static DWORD get_filesystem_flags( struct volume *volume )
         !strcmp("ext2", fstypename) ||
         !strcmp("ext3", fstypename) ||
         !strcmp("ext4", fstypename) ||
+        !strcmp("f2fs", fstypename) ||
         !strcmp("hfs", fstypename) ||
         !strcmp("hpfs", fstypename) ||
         !strcmp("ntfs", fstypename))

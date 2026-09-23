@@ -531,6 +531,9 @@ static NTSTATUS get_volume_filesystem( void *args )
     case 0xef53:      /* ext2/3/4 */
         fstypename = "ext2";
         break;
+    case 0xf2f52010:  /* f2fs */
+        fstypename = "f2fs";
+        break;
     case 0x4244:      /* hfs */
         fstypename = "hfs";
         break;
